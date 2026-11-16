@@ -35,12 +35,14 @@ import { isDevLaunch, useNav } from '../navigation/navigation'
 import { Linking } from 'react-native'
 import { useController } from 'react-hook-form'
 import { useSession } from '../store/session'
+import { LIVE } from '../services/config'
+import { restoreSession } from '../services/live/http'
 import { useDoctor } from '../store/doctor'
 import { useVerification } from '../store/verification'
 import { pickDocument } from '../platform/imagePicker'
 import { showToast } from '../store/toast'
 import { ServiceError } from '../services'
-import { declaredSchema, loginSchema, otpSchema, profileSetupSchema, type DeclaredForm } from '../validation/schemas'
+import { declaredSchema, loginSchema, newPasswordSchema, otpSchema, profileSetupSchema, type DeclaredForm } from '../validation/schemas'
 import type { VerificationDocument, VerificationStatus } from '../types'
 
 /* ===================================================== 01 — Splash ======== */
@@ -49,10 +51,26 @@ function nextAfterSplash() {
   return useSession.getState().token ? 'dr-st-loading' : 'dr-welcome'
 }
 
+/** Live: a session continues if the Keychain's refresh token still works (or the server can't say). */
+async function nextAfterSplashLive() {
+  const state = await restoreSession()
+  return state === 'signed-out' ? 'dr-welcome' : 'dr-st-loading'
+}
+
 export function SplashScreen() {
   const nav = useNav()
   React.useEffect(() => {
     if (isDevLaunch()) return
+    if (LIVE) {
+      let alive = true
+      const started = Date.now()
+      nextAfterSplashLive().then((next) => {
+        setTimeout(() => alive && nav.resetTo(next), Math.max(0, 1600 - (Date.now() - started)))
+      })
+      return () => {
+        alive = false
+      }
+    }
     const t = setTimeout(() => nav.resetTo(nextAfterSplash()), 1600)
     return () => clearTimeout(t)
   }, [nav])
@@ -148,7 +166,8 @@ export function LoginScreen() {
   const nav = useNav()
   const requestOtp = useSession((st) => st.requestOtp)
   const requestRecovery = useSession((st) => st.requestRecovery)
-  const form = useZodForm(loginSchema, { mobile: '98490 11204', password: DEMO_PASSWORD })
+  // The demo signs in with a prefilled account; live builds start empty.
+  const form = useZodForm(loginSchema, LIVE ? { mobile: '', password: '' } : { mobile: '98490 11204', password: DEMO_PASSWORD })
   const { field: mobile, fieldState: mobileState } = useController({ control: form.control, name: 'mobile' })
   const [showPassword, setShowPassword] = React.useState(false)
   const [recovering, setRecovering] = React.useState(false)
@@ -312,8 +331,13 @@ export function OtpScreen() {
   const otpMobile = useSession((st) => st.otpMobile)
   const verifyOtp = useSession((st) => st.verifyOtp)
   const resendOtp = useSession((st) => st.resendOtp)
+  const resetPassword = useSession((st) => st.resetPassword)
+  const otpMode = useSession((st) => st.otpMode)
+  // Live recovery (and an invited doctor's first password): the code sets a new password.
+  const settingPassword = LIVE && otpMode === 'recovery'
+  const passwordForm = useZodForm(newPasswordSchema, { newPassword: '' })
   const profile = useDoctor((st) => st.profile)
-  const form = useZodForm(otpSchema, { code: '7294' })
+  const form = useZodForm(otpSchema, { code: LIVE ? '' : '7294' })
   const { field: code, fieldState: codeState } = useController({ control: form.control, name: 'code' })
   const [remaining, setRemaining] = React.useState(RESEND_SECONDS)
 
@@ -329,9 +353,23 @@ export function OtpScreen() {
   }
 
   const submit = form.handleSubmit(async (v) => {
+    if (settingPassword) {
+      const ok = await passwordForm.trigger()
+      if (!ok) return
+      try {
+        await resetPassword(v.code, passwordForm.getValues('newPassword'))
+        showToast('Password saved. Sign in with your new password.', 'success')
+        nav.resetTo('dr-login')
+      } catch (e) {
+        if (e instanceof ServiceError && e.field === 'newPassword') passwordForm.setError('newPassword', { message: e.message })
+        else form.setError('code', { message: e instanceof Error ? e.message : 'Something went wrong. Try again.' })
+      }
+      return
+    }
     try {
       await verifyOtp(v.code)
-      nav.resetTo(useVerification.getState().status === 'approved' ? 'dr-st-loading' : 'dr-verification')
+      // Live: the loading screen fetches the profile, then routes by verification status.
+      nav.resetTo(LIVE || useVerification.getState().status === 'approved' ? 'dr-st-loading' : 'dr-verification')
     } catch (e) {
       form.setError('code', { message: e instanceof Error ? e.message : 'Something went wrong. Try again.' })
     }
@@ -371,6 +409,12 @@ export function OtpScreen() {
           <FieldError message={codeState.error?.message} />
         </Div>
 
+        {settingPassword ? (
+          <Div className="mt-5">
+            <FormInput control={passwordForm.control} name="newPassword" label="New password" hint="At least 8 characters. Avoid your mobile number." type="password" />
+          </Div>
+        ) : null}
+
         <Div className="mt-5 flex-row items-center justify-between">
           <Span className="text-body-sm text-ink-400">
             Resend in <Span className="font-bold tabular-nums text-ink-800">{`00:${String(remaining).padStart(2, '0')}`}</Span>
@@ -386,7 +430,7 @@ export function OtpScreen() {
 
         <Div className="mt-7">
           <Button onClick={submit} loading={form.formState.isSubmitting}>
-            Verify &amp; Continue
+            {settingPassword ? 'Save password' : 'Verify & Continue'}
           </Button>
         </Div>
 
@@ -452,6 +496,9 @@ export function VerificationScreen() {
   const removeDocument = useVerification((st) => st.removeDocument)
   const setStatus = useVerification((st) => st.setStatus)
   const resubmit = useVerification((st) => st.resubmit)
+  // Live: the server's stage, and whether the application can be sent now.
+  const serverStatus = useVerification((st) => st.serverStatus)
+  const canSubmit = useVerification((st) => st.canSubmit)
   const [denied, setDenied] = React.useState(false)
   const [editingDetails, setEditingDetails] = React.useState(false)
   const [resubmitting, setResubmitting] = React.useState(false)
@@ -480,7 +527,10 @@ export function VerificationScreen() {
     setResubmitting(true)
     try {
       await resubmit()
-      showToast('Resubmitted for review')
+      showToast(LIVE && serverStatus === 'draft' ? 'Submitted for review' : 'Resubmitted for review')
+    } catch (e) {
+      // Live: the server says what's still missing.
+      showToast('Couldn’t submit', 'critical', e instanceof Error ? e.message : undefined)
     } finally {
       setResubmitting(false)
     }
@@ -492,6 +542,7 @@ export function VerificationScreen() {
   }
 
   const statusBody = () => {
+    if (LIVE && serverStatus === 'draft') return 'Not submitted yet. Add your documents, check your details, then submit for review.'
     if (status === 'approved') return 'Your documents are verified. Consultations are now bookable by patients.'
     if (status === 'rejected') return rejectionReason
     return `Submitted ${submitted}. Our medical review team usually responds ${expected}.`
@@ -616,9 +667,9 @@ export function VerificationScreen() {
 
       <StickyBar>
         <Div className="gap-2.5">
-          {status === 'rejected' ? (
+          {(LIVE ? canSubmit : status === 'rejected') ? (
             <Button onClick={submitForReview} loading={resubmitting}>
-              Resubmit for review
+              {LIVE && serverStatus === 'draft' ? 'Submit for review' : 'Resubmit for review'}
             </Button>
           ) : (
             <Button onClick={() => nav.navigate('dr-profile-setup')}>Continue to profile</Button>
@@ -647,8 +698,14 @@ function DeclaredDetailsSheet({ onClose }: { onClose: () => void }) {
     experience: `${declared.experience} years`,
   })
   const submit = form.handleSubmit(async (v: DeclaredForm) => {
-    await saveDeclared({ ...v, experience: parseInt(v.experience, 10) })
-    onClose()
+    try {
+      await saveDeclared({ ...v, experience: parseInt(v.experience, 10) })
+      onClose()
+    } catch (e) {
+      // Live: the server's message, under the field it names when it names one.
+      const field = e instanceof ServiceError && e.field && e.field in v ? (e.field as keyof DeclaredForm) : 'name'
+      form.setError(field, { message: e instanceof Error ? e.message : 'Could not save. Try again.' })
+    }
   })
   return (
     <ModalSheet

@@ -30,7 +30,7 @@ import { useController } from 'react-hook-form'
 import { MedicineSheet } from '../components/doctor/MedicineSheet'
 import { FieldError, FormInput, useZodForm } from '../components/ui/Form'
 import { unresolvedForMedicine } from '../domain/allergy'
-import { resolveRecentChip, searchMedicines } from '../domain/medicines'
+import { resolveRecentChip, searchMedicines, useMedicineSearch } from '../domain/medicines'
 import { useAppointments } from '../store/appointments'
 import { useConsultation } from '../store/consultation'
 import { useCurrentRxKey } from '../store/context'
@@ -76,6 +76,8 @@ export function CreatePrescriptionScreen() {
   const [templates, setTemplates] = React.useState(false)
   const [noMedicines, setNoMedicines] = React.useState(false)
   const investigationForm = useZodForm(entrySchema, { value: '' })
+  // Live: medicine search answers arrive asynchronously; re-render when they do.
+  useMedicineSearch((s) => s.version)
 
   if (!rx) return <Screen background="bg-canvas" padBottom={false}><Div /></Screen>
 

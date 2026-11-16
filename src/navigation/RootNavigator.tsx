@@ -1,4 +1,9 @@
 import React, { useEffect } from 'react';
+import { LIVE } from '../services/config';
+import { setSessionEndedHandler } from '../services/live/http';
+import { clearAll } from '../services/live/sync';
+import { useSession } from '../store/session';
+import { showToast } from '../store/toast';
 import { Linking, StatusBar } from 'react-native';
 import {
   createNavigationContainerRef,
@@ -94,8 +99,22 @@ function openDevLaunchScreen() {
   if (id) navigationRef.dispatch(resetAction(id));
 }
 
+/** Live: when the session can't continue (signed out elsewhere, deactivated), back to sign-in. */
+function useSessionEnded() {
+  useEffect(() => {
+    if (!LIVE) return;
+    setSessionEndedHandler(() => {
+      clearAll();
+      useSession.setState({ token: null });
+      showToast('Your session has ended. Please sign in again.', 'critical');
+      if (navigationRef.isReady()) navigationRef.dispatch(resetAction('dr-login'));
+    });
+  }, []);
+}
+
 export function RootNavigator() {
   useDevDeepLink();
+  useSessionEnded();
   return (
     <NavigationContainer ref={navigationRef} onReady={openDevLaunchScreen}>
       <Stack.Navigator initialRouteName="dr-splash" screenOptions={{ headerShown: false }}>

@@ -10,6 +10,8 @@ export interface AuthService {
   sendRecoveryOtp(mobile: string): Promise<void>;
   verifyOtp(mobile: string, code: string): Promise<AuthSession>;
   resendOtp(mobile: string): Promise<void>;
+  /** Recovery (and an invited doctor's first password): the SMS code and the new password. */
+  resetPassword(mobile: string, code: string, newPassword: string): Promise<void>;
   changePassword(current: string, next: string): Promise<void>;
   deactivate(): Promise<void>;
 }
@@ -29,6 +31,9 @@ export const mockAuthService: AuthService = {
   },
   async resendOtp() {
     await simulate('auth.resend', 300);
+  },
+  async resetPassword() {
+    await simulate('auth.reset', 500);
   },
   async changePassword() {
     await simulate('auth.password', 500);

@@ -38,6 +38,7 @@ import { z } from 'zod'
 import { FieldError, FormInput, FormTextArea, useZodForm } from '../components/ui/Form'
 import { useCallClock } from '../hooks/useCallClock'
 import { useConsultation } from '../store/consultation'
+import { LIVE } from '../services/config'
 import { useCurrentAppointment } from '../store/context'
 import { useDoctor } from '../store/doctor'
 import { beginConsultation, ensureRxDraft, selectPatient } from '../store/flows'
@@ -688,7 +689,8 @@ export function NotesScreen() {
   const [editing, setEditing] = React.useState<null | { list: 'diagnosis' | 'advice'; index?: number }>(null)
   const [templates, setTemplates] = React.useState(false)
 
-  const seededDiagnosis = consultationDraft.diagnosis
+  // Demo: the blueprint's suggested diagnoses. Live: none until the doctor writes them.
+  const seededDiagnosis = LIVE ? [] : consultationDraft.diagnosis
   const addSymptom = (s: string) => symptoms.onChange([...symptoms.value, s])
   const removeSymptom = (s: string) => symptoms.onChange(symptoms.value.filter((x: string) => x !== s))
 

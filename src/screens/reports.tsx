@@ -15,6 +15,9 @@ import { Field } from '../components/ui/Inputs'
 import { REPORT_DEFAULT_ID } from '../mock-data/seed'
 import { openPrescriptionForPatient } from '../store/flows'
 import { useRecords } from '../store/records'
+import { LIVE } from '../services/config'
+import { loadReport } from '../services/live/sync-records'
+import { LoadingState, StateBlock } from '../components/ui/Feedback'
 import { useSelection } from '../store/selection'
 import { showToast } from '../store/toast'
 import { reportNoteSchema } from '../validation/schemas'
@@ -27,7 +30,34 @@ const FLAG = {
 
 /* ========================================= 29 — Diagnostic report detail = */
 
+/** Live: the report is fetched when opened (each read is logged on the server). */
 export function ReportDetailScreen() {
+  const reportId = useSelection((st) => st.reportId) ?? REPORT_DEFAULT_ID
+  const loaded = useRecords((st) => Boolean(st.reportDetails[reportId]))
+  const [failed, setFailed] = React.useState<string | null>(null)
+  React.useEffect(() => {
+    if (!LIVE) return
+    setFailed(null)
+    loadReport(reportId).catch((e: unknown) => setFailed(e instanceof Error ? e.message : 'Couldn’t load the report'))
+  }, [reportId])
+  if (LIVE && !loaded) {
+    return (
+      <Screen background="bg-canvas" padBottom={false}>
+        <ScreenHeader title="Report" />
+        <Div className="flex-1 items-center justify-center px-6">
+          {failed ? (
+            <StateBlock icon={<AlertTriangle className="h-[22px] w-[22px] text-critical-600" strokeWidth={2.2} />} title="Couldn’t open this report" body={failed} tone="critical" />
+          ) : (
+            <LoadingState label="Opening the report…" />
+          )}
+        </Div>
+      </Screen>
+    )
+  }
+  return <ReportDetailBody />
+}
+
+function ReportDetailBody() {
   const nav = useNav()
   const reportId = useSelection((st) => st.reportId) ?? REPORT_DEFAULT_ID
   const r = useRecords((st) => st.reportDetails[reportId] ?? st.reportDetails[REPORT_DEFAULT_ID])

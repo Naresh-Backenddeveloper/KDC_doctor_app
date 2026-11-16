@@ -4,6 +4,7 @@ import { seed } from '../mock-data/seed';
 import { services } from '../services';
 import type { ConsultationHistoryEntry, Patient, Report, ReportDetail } from '../types';
 import { persistStorage } from './storage';
+import { LIVE } from '../services/config';
 
 export type PatientFilter = 'All' | 'Recent' | 'Upcoming' | 'Completed' | 'Follow-up due';
 
@@ -18,7 +19,12 @@ interface RecordsState {
   patchPatient: (id: string, patch: Partial<Patient>) => void;
 }
 
-const FALLBACK = seed.patients()[0];
+/** Live: someone not loaded (yet) is shown as a blank patient, never as a demo one. */
+export const emptyPatient = (id: string): Patient => ({
+  id, name: '', age: 0, gender: 'Male', blood: '', mobileMasked: '', city: '', conditions: [], allergies: [], lastConsult: '', consults: 0, since: '',
+});
+
+const FALLBACK = LIVE ? emptyPatient('') : seed.patients()[0];
 
 export function filterPatients(patients: Patient[], query: string, filter: PatientFilter) {
   const q = query.trim().toLowerCase();
@@ -43,11 +49,12 @@ export const countAwaiting = (reports: Report[]) => reports.filter((r) => r.stat
 export const useRecords = create<RecordsState>()(
   persist(
     (set, get) => ({
-      patients: seed.patients(),
-      reports: seed.reports(),
-      history: seed.history(),
-      reportDetails: seed.reportDetails(),
-      patientById: (id) => get().patients.find((p) => p.id === id) ?? FALLBACK,
+      // Live: filled from the server (services/live/sync-records.ts), never seeded.
+      patients: LIVE ? [] : seed.patients(),
+      reports: LIVE ? [] : seed.reports(),
+      history: LIVE ? [] : seed.history(),
+      reportDetails: LIVE ? {} : seed.reportDetails(),
+      patientById: (id) => get().patients.find((p) => p.id === id) ?? (LIVE ? emptyPatient(id) : FALLBACK),
       markReportReviewed: async (id, note) => {
         await services.records.markReportReviewed(id, note);
         set((s) => ({ reports: s.reports.map((r) => (r.id === id ? { ...r, status: 'reviewed', note } : r)) }));
@@ -59,7 +66,8 @@ export const useRecords = create<RecordsState>()(
     {
       name: 'records',
       storage: persistStorage,
-      partialize: ({ patients, reports, history, reportDetails }) => ({ patients, reports, history, reportDetails }),
+      // Live: patient records are never written to the phone's storage.
+      partialize: ({ patients, reports, history, reportDetails }) => (LIVE ? {} : { patients, reports, history, reportDetails }),
     },
   ),
 );

@@ -7,7 +7,7 @@ import { FieldError, FormSelect, FormTextArea, useZodForm } from '../ui/Form'
 import { Checkbox, SearchInput } from '../ui/Inputs'
 import { StatusBadge } from '../ui/Display'
 import { checkAllergies } from '../../domain/allergy'
-import { DOSAGE_OPTIONS, DURATION_OPTIONS, FOOD_OPTIONS, FREQUENCY_OPTIONS, searchMedicines, toPrescribed } from '../../domain/medicines'
+import { DOSAGE_OPTIONS, DURATION_OPTIONS, FOOD_OPTIONS, FREQUENCY_OPTIONS, searchMedicines, toPrescribed, useMedicineSearch } from '../../domain/medicines'
 import { MEDICINE_CATALOG } from '../../mock-data/medicines'
 import type { AllergyConflict, CatalogMedicine, PrescribedMedicine } from '../../types'
 import { allergyOverrideSchema, medicineSchema, type MedicineForm } from '../../validation/schemas'
@@ -33,6 +33,8 @@ export function MedicineSheet({
   onSave: (medicine: PrescribedMedicine) => void
   onClose: () => void
 }) {
+  // Live: search results arrive later; re-render when they do.
+  useMedicineSearch((st) => st.version)
   const [query, setQuery] = React.useState('')
   const [selected, setSelected] = React.useState<CatalogMedicine | undefined>(initial)
   const base: PrescribedMedicine | undefined = editing ?? (selected ? toPrescribed(selected) : undefined)

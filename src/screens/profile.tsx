@@ -1,4 +1,5 @@
 import { Btn, Div, P, Span, SvgBox, SvgG, SvgPath, SvgRect } from '../components/primitives/index'
+import { LIVE } from '../services/config'
 import React from 'react'
 import {
   Stethoscope,
@@ -151,7 +152,7 @@ export function ProfileScreen() {
     { Icon: IndianRupee, label: 'Consultation fees', sub: `${rupee(doctor.fees.audio)} – ${rupee(doctor.fees.clinic)}`, screen: 'dr-fees' },
     { Icon: CalendarClock, label: 'Availability', sub: 'Mon–Sat · 6 working days', screen: 'dr-availability' },
     { Icon: Building2, label: 'Clinic information', sub: doctor.hospital, screen: 'dr-clinic' },
-    { Icon: Landmark, label: 'Bank details', sub: `${bank.name} ${bank.account}`, screen: 'dr-bank' },
+    { Icon: Landmark, label: 'Bank details', sub: bank.account ? `${bank.name} ${bank.account}` : 'Add your settlement account', screen: 'dr-bank' },
   ]
   const account = [
     { Icon: Bell, label: 'Notifications', sub: 'Push, SMS and email', screen: 'dr-notifications' },
@@ -638,6 +639,9 @@ export function BankScreen() {
   const nav = useNav()
   const bank = useBank((st) => st.bank)
   const markVerified = useBank((st) => st.markVerified)
+  // Live: no account yet, or one operations couldn't verify.
+  const hasAccount = useBank((st) => st.hasAccount)
+  const failure = useBank((st) => st.failure)
   React.useEffect(() => {
     if (bank.status !== 'verifying') return
     // The mock ₹1 test credit clears shortly after the new account is saved.
@@ -649,6 +653,11 @@ export function BankScreen() {
       <ScreenHeader title="Bank details" />
 
       <Div className="flex-1 gap-3 px-5 pb-[130px] pt-4">
+        {LIVE && !hasAccount ? (
+          <Banner tone="brand" title="No settlement account yet" body="Add the bank account your payouts go to. Our team verifies it before the first payout." />
+        ) : null}
+        {LIVE && failure ? <Banner tone="critical" title="We couldn’t verify this account" body={`${failure} Update your bank details to try again.`} /> : null}
+        {!LIVE || hasAccount ? (
         <Card elevation="tile">
           <Div className="mb-3 flex-row items-center justify-between">
             <P className="text-[11px] font-bold uppercase tracking-[.08em] text-ink-500">Settlement account</P>
@@ -671,6 +680,7 @@ export function BankScreen() {
           <KeyValue label="Branch" value={bank.branch} />
           <KeyValue label="Account type" value={bank.type} />
         </Card>
+        ) : null}
 
         <Banner
           tone="caution"

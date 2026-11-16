@@ -40,6 +40,10 @@ import { loadSchedule, markNoShow, notifyRunningLate, sendPrescription, setOnDut
 import { useNotifications } from '../store/notifications'
 import { usePrescriptions } from '../store/prescriptions'
 import { useRecords } from '../store/records'
+import { LIVE } from '../services/config'
+import { ServiceError } from '../services'
+import { syncAll } from '../services/live/sync'
+import { useVerification } from '../store/verification'
 import { useSelection } from '../store/selection'
 import { MODE } from '../components/doctor/index'
 import { showToast } from '../store/toast'
@@ -76,6 +80,19 @@ export function LoadingScreen() {
   React.useEffect(() => {
     if (isDevLaunch()) return
     let live = true
+    if (LIVE) {
+      // Everything comes from the server: profile, verification, schedule, patients, earnings…
+      // Doctors still being verified go to their verification screen.
+      syncAll()
+        .then(() => live && (useVerification.getState().status === 'approved' ? nav.resetTo('dr-home', 'home') : nav.resetTo('dr-verification')))
+        .catch((e) => {
+          if (!live || (e instanceof ServiceError && e.code === 'session_ended')) return
+          nav.resetTo('dr-st-api-error')
+        })
+      return () => {
+        live = false
+      }
+    }
     loadSchedule()
       .then(() => live && nav.resetTo('dr-home', 'home'))
       .catch(() => live && nav.resetTo('dr-st-api-error'))

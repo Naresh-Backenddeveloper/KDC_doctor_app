@@ -5,6 +5,7 @@ import { services } from '../services';
 import type { DoctorNotification } from '../types';
 import { nowTime } from '../utils/date';
 import { persistStorage } from './storage';
+import { LIVE } from '../services/config';
 
 interface NotificationsState {
   items: DoctorNotification[];
@@ -17,7 +18,7 @@ interface NotificationsState {
 export const useNotifications = create<NotificationsState>()(
   persist(
     (set, get) => ({
-      items: seed.notifications(),
+      items: LIVE ? [] : seed.notifications(),
       unreadCount: () => get().items.filter((n) => n.unread).length,
       markRead: (id) => {
         if (!get().items.find((n) => n.id === id)?.unread) return;
@@ -29,11 +30,12 @@ export const useNotifications = create<NotificationsState>()(
         set((s) => ({ items: s.items.map((n) => ({ ...n, unread: false })) }));
         services.notifications.markRead(ids).catch(() => undefined);
       },
-      add: (n) =>
-        set((s) => ({
-          items: [{ id: `n-${Date.now()}`, group: 'Today', time: nowTime(), unread: true, ...n }, ...s.items],
-        })),
+      // Live: the inbox is only what the server sent (it's reloaded); nothing local is added.
+      add: (n) => {
+        if (LIVE) return;
+        set((s) => ({ items: [{ id: `n-${Date.now()}`, group: 'Today', time: nowTime(), unread: true, ...n }, ...s.items] }));
+      },
     }),
-    { name: 'notifications', storage: persistStorage, partialize: ({ items }) => ({ items }) },
+    { name: 'notifications', storage: persistStorage, partialize: ({ items }) => (LIVE ? {} : { items }) },
   ),
 );

@@ -22,15 +22,30 @@ import { useBank } from '../store/bank'
 import { earningDates, filterEarnings, useEarnings, type EarningFilter } from '../store/earnings'
 import { showToast } from '../store/toast'
 import { services } from '../services'
+import { LIVE } from '../services/config'
+import { fetchStatementSummary, monthLabel } from '../services/live/earnings'
 
 /* ============================================ 31 — Earnings dashboard ==== */
 
 const requestStatement = (period: string) => {
+  if (LIVE) {
+    // Live: the month's statement from the server, shown as its totals.
+    fetchStatementSummary(period)
+      .then((s) =>
+        showToast(`Statement · ${period}`, 'info', `${s.consultations} consultations · ${rupee(s.net)} earned · ${rupee(s.paidOut)} paid out · TDS ${rupee(s.tdsDeducted)}`),
+      )
+      .catch((e) => showToast('Could not load the statement', 'critical', e instanceof Error ? e.message : undefined))
+    return
+  }
   services.earnings
     .requestStatement(period)
     .then(() => showToast('Statement requested', 'info', 'It will arrive by email shortly.'))
     .catch(() => showToast('Could not request the statement', 'critical'))
 }
+
+/** Live: the real months; the demo is set in October 2026. */
+const THIS_MONTH = LIVE ? monthLabel(0) : 'October 2026'
+const LAST_MONTH = LIVE ? monthLabel(-1) : 'September 2026'
 
 export function EarningsScreen() {
   const nav = useNav()
@@ -48,12 +63,12 @@ export function EarningsScreen() {
         <Div className="bg-ink-900 px-5 pb-6" style={{ paddingTop: DEVICE.safeTop + 10 }}>
           <Div className="flex-row items-center justify-between">
             <P className="text-title-md text-white">Earnings</P>
-            <IconButton size={36} tone="glass" label="Statement" onClick={() => requestStatement('October 2026')}>
+            <IconButton size={36} tone="glass" label="Statement" onClick={() => requestStatement(THIS_MONTH)}>
               <Download className="h-[16px] w-[16px]" strokeWidth={2.2} />
             </IconButton>
           </Div>
 
-          <P className="mt-5 text-caption text-white/50">This month · October 2026</P>
+          <P className="mt-5 text-caption text-white/50">This month · {THIS_MONTH}</P>
           <P className="mt-1.5 font-display text-[36px] font-extrabold leading-none tabular-nums tracking-[-1px] text-white">
             {rupee(earnings.month)}
           </P>
@@ -262,6 +277,8 @@ export function EarningsHistoryScreen() {
 export function PayoutScreen() {
   const nav = useNav()
   const payout = useEarnings((st) => st.payout)
+  const commissionPct = useEarnings((st) => st.commissionPct)
+  const clearanceHours = useEarnings((st) => st.clearanceHours)
   const bank = useBank((st) => st.bank)
   return (
     <Screen background="bg-canvas" padBottom={false}>
@@ -334,8 +351,8 @@ export function PayoutScreen() {
         <Card elevation="tile">
           <P className="mb-2.5 text-[11px] font-bold uppercase tracking-[.08em] text-ink-500">Payout schedule</P>
           <KeyValue label="Cycle" value={payout.nextPayout.cycle} />
-          <KeyValue label="Clearance" value="48 hours after consultation" />
-          <KeyValue label="Platform fee" value="12% of consultation fee" />
+          <KeyValue label="Clearance" value={`${clearanceHours} hours after consultation`} />
+          <KeyValue label="Platform fee" value={`${commissionPct}% of consultation fee`} />
           <KeyValue label="TDS" value="Deducted as per Section 194J" />
         </Card>
 
@@ -343,9 +360,9 @@ export function PayoutScreen() {
           tone="brand"
           icon={<FileText className="h-[16px] w-[16px]" strokeWidth={2.2} />}
           title="Monthly statement available"
-          body="September 2026 statement with TDS summary is ready to download."
-          action="Get"
-          onAction={() => requestStatement('September 2026')}
+          body={`${LAST_MONTH} statement with TDS summary is ready${LIVE ? '.' : ' to download.'}`}
+          action={LIVE ? 'View' : 'Get'}
+          onAction={() => requestStatement(LAST_MONTH)}
         />
       </Div>
 

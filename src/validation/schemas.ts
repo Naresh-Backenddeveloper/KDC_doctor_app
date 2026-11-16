@@ -257,3 +257,7 @@ export type TicketForm = z.infer<typeof ticketSchema>;
 
 export const reportNoteSchema = z.object({ note: z.string().max(800, 'Keep the note under 800 characters') });
 export type ReportNoteForm = z.infer<typeof reportNoteSchema>;
+
+/** Recovery, and an invited doctor's first password (live builds). The server also refuses common or personal passwords. */
+export const newPasswordSchema = z.object({ newPassword: z.string().min(8, 'Use at least 8 characters').max(128, 'Use at most 128 characters') });
+export type NewPasswordForm = z.infer<typeof newPasswordSchema>;

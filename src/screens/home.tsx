@@ -27,6 +27,8 @@ import { todaySchedule } from '../mock-data/mock'
 import { DEFAULT_APPT_ID } from '../mock-data/seed'
 import { useNav } from '../navigation/navigation'
 import { useAppointments } from '../store/appointments'
+import { useAvailability } from '../store/availability'
+import { LIVE } from '../services/config'
 import { useDoctor } from '../store/doctor'
 import { acceptRequest, openPrescriptionForPatient, roomFor, selectAppointment, selectPatient, setOnDuty } from '../store/flows'
 import { useNotifications } from '../store/notifications'
@@ -59,11 +61,15 @@ export function DoctorHomeScreen() {
   const next = nextUpcoming(appointments)
   const nextPatient = next ? patientById(next.patientId) : undefined
   const recent = patients.slice(0, 6)
-  const scheduleRows = todaySchedule.flatMap((row): { row: typeof row; appt?: Appointment }[] => {
-    if (!row.apptId) return [{ row }]
-    const appt = appointments.find((a) => a.id === row.apptId)
-    return appt && appt.status !== 'cancelled' ? [{ row, appt }] : []
-  })
+  const breakFrom = useAvailability((s) => s.breakFrom)
+  const scheduleRows = LIVE
+    ? liveScheduleRows(today, breakFrom)
+    : todaySchedule.flatMap((row): { row: { time: string; apptId?: string; break?: string }; appt?: Appointment }[] => {
+        if (!row.apptId) return [{ row }]
+        const appt = appointments.find((a) => a.id === row.apptId)
+        return appt && appt.status !== 'cancelled' ? [{ row, appt }] : []
+      })
+  const breaks = scheduleRows.filter((r) => !r.appt).length
   const awaitingReports = countAwaiting(reports)
   const actions = pendingActions.flatMap((a) =>
     a.id === 'pa2'
@@ -194,7 +200,7 @@ export function DoctorHomeScreen() {
               </Div>
               <Div className="shrink-0 text-right">
                 <P className="text-title-sm tabular-nums text-ink-900">{next.time}</P>
-                <P className="mt-0.5 text-caption text-ink-400">{next.id === DEFAULT_APPT_ID ? 'in 2h 14m' : 'Today'}</P>
+                <P className="mt-0.5 text-caption text-ink-400">{LIVE ? startsIn(next.time) : next.id === DEFAULT_APPT_ID ? 'in 2h 14m' : 'Today'}</P>
               </Div>
             </Div>
 
@@ -249,7 +255,7 @@ export function DoctorHomeScreen() {
         <Div className="pt-6">
           <SectionHeader
             title="Today's schedule"
-            subtitle={`${scheduleRows.length} appointments · 1 break`}
+            subtitle={`${scheduleRows.length - breaks} appointments${breaks ? ` · ${breaks} break` : ''}`}
             action="Calendar"
             onAction={() => nav.navigate('dr-calendar')}
             className="pb-3"
@@ -320,4 +326,22 @@ export function DoctorHomeScreen() {
       <DoctorNav active="home" />
     </Screen>
   )
+}
+
+/** Live: today's timeline from the real appointments (not cancelled), with the break if it falls today. */
+function liveScheduleRows(today: Appointment[], breakFrom: string): { row: { time: string; apptId?: string; break?: string }; appt?: Appointment }[] {
+  const rows: { row: { time: string; apptId?: string; break?: string }; appt?: Appointment }[] = today
+    .filter((a) => a.status !== 'cancelled' && a.status !== 'no-show')
+    .map((a) => ({ row: { time: a.time.replace(/^0/, ''), apptId: a.id }, appt: a }))
+  if (rows.length && breakFrom) rows.push({ row: { time: breakFrom.replace(/^0/, ''), break: 'Break' } })
+  return rows.sort((x, y) => minutesOf(x.row.time) - minutesOf(y.row.time))
+}
+
+/** "in 2h 14m", "in 25m" or "now", from the device clock. */
+function startsIn(time: string): string {
+  const now = new Date()
+  const diff = minutesOf(time) - (now.getHours() * 60 + now.getMinutes())
+  if (diff <= 0) return 'now'
+  const h = Math.floor(diff / 60)
+  return `in ${h ? `${h}h ` : ''}${diff % 60}m`
 }

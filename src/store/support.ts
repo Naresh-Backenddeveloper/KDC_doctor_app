@@ -5,6 +5,7 @@ import { services } from '../services';
 import type { SupportTicket } from '../types';
 import { nowTime, recordDate, TODAY_KEY } from '../utils/date';
 import { persistStorage } from './storage';
+import { LIVE } from '../services/config';
 
 interface SupportState {
   tickets: SupportTicket[];
@@ -17,9 +18,11 @@ const stamp = () => `${recordDate(TODAY_KEY).slice(0, 6)}, ${nowTime()}`;
 export const useSupport = create<SupportState>()(
   persist(
     (set) => ({
-      tickets: [seed.ticket()],
+      tickets: LIVE ? [] : [seed.ticket()],
       reply: async (ticketId, text) => {
         await services.support.reply(ticketId, text);
+        // Live: the service reloads the ticket from the server.
+        if (LIVE) return;
         const at = stamp();
         set((s) => ({
           tickets: s.tickets.map((t) =>
@@ -29,6 +32,7 @@ export const useSupport = create<SupportState>()(
       },
       create: async (subject, description) => {
         const { id } = await services.support.create(subject, description);
+        if (LIVE) return id;
         const at = stamp();
         set((s) => ({
           tickets: [
@@ -39,6 +43,6 @@ export const useSupport = create<SupportState>()(
         return id;
       },
     }),
-    { name: 'support', storage: persistStorage },
+    { name: 'support', storage: persistStorage, partialize: (s) => (LIVE ? {} : { tickets: s.tickets }) },
   ),
 );

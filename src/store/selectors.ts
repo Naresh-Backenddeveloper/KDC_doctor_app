@@ -1,5 +1,6 @@
 import { minutesOf, TODAY_KEY, addDays, daysBetween } from '../utils/date';
 import type { Appointment, BlockedTime, Mode, WorkingDay } from '../types';
+import { LIVE } from '../services/config';
 
 export type ApptTab = 'today' | 'upcoming' | 'completed' | 'cancelled';
 
@@ -10,8 +11,8 @@ export interface ApptFilters {
 
 export const NO_FILTERS: ApptFilters = { modes: [], visit: 'all' };
 
-/** The blueprint's day totals count four morning consultations that predate the list. */
-export const EARLIER_COMPLETED = 4;
+/** The blueprint's day totals count four morning consultations that predate the list (demo only). */
+export const EARLIER_COMPLETED = LIVE ? 0 : 4;
 
 export const isToday = (a: Pick<Appointment, 'dateKey'>) => a.dateKey === TODAY_KEY;
 const byTime = (a: Appointment, b: Appointment) => minutesOf(a.time) - minutesOf(b.time);

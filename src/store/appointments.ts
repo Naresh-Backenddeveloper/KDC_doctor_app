@@ -5,6 +5,7 @@ import { services } from '../services';
 import type { Appointment, PendingAction } from '../types';
 import { minutesOf, timeLabel } from '../utils/date';
 import { persistStorage } from './storage';
+import { LIVE } from '../services/config';
 
 interface AppointmentsState {
   appointments: Appointment[];
@@ -24,10 +25,11 @@ interface AppointmentsState {
 export const useAppointments = create<AppointmentsState>()(
   persist(
     (set, get) => ({
-      appointments: seed.appointments(),
-      heldRequests: seed.heldRequests(),
-      onDuty: true,
-      pendingActions: seed.pending(),
+      // Live: filled from the server by services/live/sync-schedule.ts.
+      appointments: LIVE ? [] : seed.appointments(),
+      heldRequests: LIVE ? [] : seed.heldRequests(),
+      onDuty: !LIVE,
+      pendingActions: LIVE ? [] : seed.pending(),
       // Local changes win: the mock server has no memory of them across launches.
       merge: (fresh) =>
         set((s) => ({ appointments: [...s.appointments, ...fresh.filter((f) => !s.appointments.some((a) => a.id === f.id))] })),
@@ -61,7 +63,8 @@ export const useAppointments = create<AppointmentsState>()(
     {
       name: 'appointments',
       storage: persistStorage,
-      partialize: ({ appointments, heldRequests, onDuty, pendingActions }) => ({ appointments, heldRequests, onDuty, pendingActions }),
+      // Live: patients' appointments are never written to the phone.
+      partialize: ({ appointments, heldRequests, onDuty, pendingActions }) => (LIVE ? {} : { appointments, heldRequests, onDuty, pendingActions }),
     },
   ),
 );

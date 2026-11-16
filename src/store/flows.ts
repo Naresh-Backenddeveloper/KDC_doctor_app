@@ -1,4 +1,8 @@
 import { services } from '../services';
+import { LIVE } from '../services/config';
+import * as liveSchedule from '../services/live/flows-schedule';
+import * as liveRecords from '../services/live/flows-records';
+import * as liveAccount from '../services/live/flows-account';
 import { unresolvedConflicts } from '../domain/allergy';
 import type { Appointment, BankUpdate, Prescription } from '../types';
 import { addDays, longDate, recordDate, shortDate, TODAY_KEY } from '../utils/date';
@@ -29,15 +33,18 @@ export function selectPatient(patientId: string) {
 }
 
 export async function loadSchedule() {
+  if (LIVE) return liveSchedule.loadSchedule();
   useAppointments.getState().merge(await services.appointments.list());
 }
 
 export function setOnDuty(on: boolean) {
+  if (LIVE) return liveSchedule.setOnDuty(on);
   useAppointments.getState().setOnDuty(on).catch(() => undefined);
 }
 
 /** A patient request has to be accepted before it behaves like a booked visit. */
 export function acceptRequest(apptId: string) {
+  if (LIVE) return liveSchedule.acceptRequest(apptId);
   useAppointments.getState().acceptRequest(apptId);
 }
 
@@ -46,6 +53,7 @@ export const roomFor = (appt: Pick<Appointment, 'mode'>) => (appt.mode === 'clin
 
 /** Starts the clock and returns the screen the consultation happens on. */
 export function beginConsultation(apptId: string): string {
+  if (LIVE) return liveSchedule.beginConsultation(apptId);
   const appt = apptOf(apptId);
   selectAppointment(apptId);
   useAppointments.getState().patch(apptId, { status: 'in-progress', requested: false });
@@ -55,6 +63,7 @@ export function beginConsultation(apptId: string): string {
 }
 
 export function markNoShow(apptId: string) {
+  if (LIVE) return liveSchedule.markNoShow(apptId);
   const a = apptOf(apptId);
   if (!a) return;
   useAppointments.getState().setStatus(apptId, 'no-show', 'Patient did not join').catch(() => undefined);
@@ -62,12 +71,14 @@ export function markNoShow(apptId: string) {
 }
 
 export function cancelAppointment(apptId: string) {
+  if (LIVE) return liveSchedule.cancelAppointment(apptId);
   const a = apptOf(apptId);
   if (!a) return;
   useAppointments.getState().setStatus(apptId, 'cancelled', 'Cancelled by you').catch(() => undefined);
 }
 
 export async function rescheduleAppointment(apptId: string, target: { key: string; label: string; time: string }): Promise<string | null> {
+  if (LIVE) return liveSchedule.rescheduleAppointment(apptId, target);
   const state = useAppointments.getState();
   const clash = state.appointments.some(
     (a) => a.id !== apptId && a.dateKey === target.key && a.time.replace(/^0/, '') === target.time.replace(/^0/, '') && a.status !== 'cancelled',
@@ -79,11 +90,13 @@ export async function rescheduleAppointment(apptId: string, target: { key: strin
 }
 
 export async function notifyRunningLate() {
+  if (LIVE) return liveSchedule.notifyRunningLate();
   await services.appointments.notifyRunningLate(22);
   useAppointments.getState().dismissAction('pa0');
 }
 
 export async function blockTime(form: BlockTimeForm) {
+  if (LIVE) return liveSchedule.blockTime(form);
   const { fromKey, toKey, allDay, from, to, reason, note } = form;
   const affected = affectedByBlock(useAppointments.getState().appointments, { fromKey, toKey, allDay, from, to });
   const label = note.trim() || `${reason} block`;
@@ -111,6 +124,7 @@ export async function blockTime(form: BlockTimeForm) {
 /* ------------------------------------------------------- Prescriptions */
 
 export function openPrescriptionForPatient(patientId: string) {
+  if (LIVE) return liveRecords.openPrescriptionForPatient(patientId);
   const key = `pt:${patientId}`;
   useSelection.getState().select({ patientId, rxKey: key, viewRxId: null });
   usePrescriptions.getState().ensureDraft(key, { patientId });
@@ -119,6 +133,7 @@ export function openPrescriptionForPatient(patientId: string) {
 
 /** Makes sure a prescription draft exists for the consultation being written. */
 export function ensureRxDraft(key: string) {
+  if (LIVE) return liveRecords.ensureRxDraft(key);
   const appt = apptOf(key);
   if (appt) {
     const diagnosis = useConsultation.getState().draftFor(key).diagnosis;
@@ -133,6 +148,7 @@ export type SendResult =
 
 /** The allergy gate runs here too, so no path can send past an unresolved conflict. */
 export async function sendPrescription(key: string): Promise<SendResult> {
+  if (LIVE) return liveRecords.sendPrescription(key);
   const rxState = usePrescriptions.getState();
   const rx = rxState.drafts[key];
   if (!rx) return { ok: false, reason: 'missing' };
@@ -185,6 +201,7 @@ export async function sendPrescription(key: string): Promise<SendResult> {
 
 /** Confirms the follow-up, placing it on the calendar when one is required. */
 export function scheduleFollowUp(key: string, form: FollowUpForm, dateKey?: string) {
+  if (LIVE) return liveRecords.scheduleFollowUp(key, form, dateKey);
   const state = usePrescriptions.getState();
   const rx = state.drafts[key];
   if (!rx) return;
@@ -217,6 +234,7 @@ export type BankSaveResult = 'verifying' | 'name-mismatch';
 
 /** Bank rejects a credit when the holder differs from the PAN name, so the payout fails. */
 export async function saveBankDetails(update: BankUpdate): Promise<BankSaveResult> {
+  if (LIVE) return liveAccount.saveBankDetails(update);
   const bank = useBank.getState();
   const panHolder = bank.bank.panHolder;
   await bank.update(update);

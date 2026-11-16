@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- lazy requires break import cycles between stores and live services */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DEFAULT_APPT_ID, emptyConsultDraft, seed } from '../mock-data/seed';
 import { services } from '../services';
 import type { ConsultationDraft } from '../types';
 import { persistStorage } from './storage';
+import { LIVE } from '../services/config';
 
 interface ActiveConsult {
   apptId: string;
@@ -30,7 +32,8 @@ interface ConsultationState {
 export const useConsultation = create<ConsultationState>()(
   persist(
     (set, get) => ({
-      drafts: { [DEFAULT_APPT_ID]: seed.draftConsult() },
+      // Live: notes come from the server per consultation; none are seeded.
+      drafts: (LIVE ? {} : { [DEFAULT_APPT_ID]: seed.draftConsult() }) as Record<string, ConsultationDraft>,
       active: null,
       mic: true,
       camera: true,
@@ -42,8 +45,14 @@ export const useConsultation = create<ConsultationState>()(
         set((s) => ({ drafts: { ...s.drafts, [key]: next } }));
       },
       startCall: (apptId) => set({ active: { apptId, startedAt: Date.now() }, mic: true, camera: true, speaker: true }),
-      endCall: () =>
-        set((s) => (s.active && !s.active.endedAt ? { active: { ...s.active, endedAt: Date.now() } } : s)),
+      endCall: () => {
+        const active = get().active;
+        set((s) => (s.active && !s.active.endedAt ? { active: { ...s.active, endedAt: Date.now() } } : s));
+        // Live: the call ends on the server too (completing comes with the prescription or "complete").
+        if (LIVE && active && !active.endedAt) {
+          void Promise.resolve(require('../services/live/http') as typeof import('../services/live/http')).then((m) => m.api.post(`doctor/consultations/${encodeURIComponent(active.apptId)}/end`, {})).catch(() => undefined);
+        }
+      },
       clearActive: () => set({ active: null }),
       toggleMic: () => set((s) => ({ mic: !s.mic })),
       toggleCamera: () => set((s) => ({ camera: !s.camera })),
@@ -52,7 +61,8 @@ export const useConsultation = create<ConsultationState>()(
     {
       name: 'consultation',
       storage: persistStorage,
-      partialize: ({ drafts, active }) => ({ drafts, active }),
+      // Live: clinical notes are never written to the phone (only which call is running).
+      partialize: ({ drafts, active }) => (LIVE ? { active } : { drafts, active }),
     },
   ),
 );

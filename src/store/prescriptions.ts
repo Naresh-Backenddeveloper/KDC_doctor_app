@@ -4,6 +4,7 @@ import { DEFAULT_APPT_ID, seed, seedDraftRx } from '../mock-data/seed';
 import type { PrescribedMedicine, Prescription, PrescriptionSummary } from '../types';
 import { longDate, recordDate, TODAY_KEY, addDays } from '../utils/date';
 import { persistStorage } from './storage';
+import { LIVE } from '../services/config';
 
 const FOUR_WEEKS_OUT = longDate(addDays(TODAY_KEY, 28));
 
@@ -23,9 +24,10 @@ const nextRxId = () => `KDC-RX-2026-${90000 + Math.floor(Math.random() * 9999)}`
 export const usePrescriptions = create<PrescriptionsState>()(
   persist(
     (set, get) => ({
-      drafts: { [DEFAULT_APPT_ID]: seedDraftRx() },
-      docs: seed.rxDocs(),
-      summaries: seed.rxSummaries(),
+      // Live: drafts live in memory and on the server; issued ones come from the server.
+      drafts: (LIVE ? {} : { [DEFAULT_APPT_ID]: seedDraftRx() }) as Record<string, Prescription>,
+      docs: LIVE ? {} : seed.rxDocs(),
+      summaries: LIVE ? [] : seed.rxSummaries(),
       ensureDraft: (key, init) => {
         if (get().drafts[key]) return;
         const draft: Prescription = {
@@ -63,7 +65,12 @@ export const usePrescriptions = create<PrescriptionsState>()(
           drafts: { ...s.drafts, [rx.key]: rx },
         })),
     }),
-    { name: 'prescriptions', storage: persistStorage, partialize: ({ drafts, docs, summaries }) => ({ drafts, docs, summaries }) },
+    {
+      name: 'prescriptions',
+      storage: persistStorage,
+      // Live: prescriptions are never written to the phone's storage.
+      partialize: ({ drafts, docs, summaries }) => (LIVE ? {} : { drafts, docs, summaries }),
+    },
   ),
 );
 

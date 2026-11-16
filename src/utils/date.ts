@@ -1,5 +1,15 @@
-/** The prototype's fixed "today"; every relative label in the seed data hangs off it. */
-export const TODAY_KEY = '2026-10-05';
+import { LIVE } from '../services/config';
+
+/** Today's date key (YYYY-MM-DD, device time). */
+export function localTodayKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * "Today". Live: the real date when the app started (the loading screen refreshes the
+ * data each launch). Demo: the prototype's fixed day, which the seed data hangs off.
+ */
+export const TODAY_KEY = LIVE ? localTodayKey() : '2026-10-05';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

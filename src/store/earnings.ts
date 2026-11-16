@@ -4,13 +4,32 @@ import { seed } from '../mock-data/seed';
 import type { EarningRow, EarningsSummary, FailedPayout, Mode, Payout } from '../types';
 import { recordDate, TODAY_KEY } from '../utils/date';
 import { persistStorage } from './storage';
+import { LIVE } from '../services/config';
 
 export type EarningFilter = 'This month' | 'Last month' | 'Settled' | 'Processing' | 'No-shows';
+
+/** Live builds start empty; figures come from the server (services/live/sync-account.ts). */
+export const EMPTY_SUMMARY: EarningsSummary = {
+  today: 0,
+  week: 0,
+  month: 0,
+  byMode: { video: 0, audio: 0, clinic: 0 },
+  consultsThisMonth: 0,
+  avgPerConsult: 0,
+  weekSeries: [0, 0, 0, 0, 0, 0, 0],
+  monthSeries: [0, 0, 0, 0, 0],
+  settledThisMonth: 0,
+};
+export const EMPTY_PAYOUT: Payout = { available: 0, pending: 0, lastPayout: { amount: 0, date: '—' }, nextPayout: { date: '—', cycle: '' } };
 
 interface EarningsState {
   summary: EarningsSummary;
   rows: EarningRow[];
   payout: Payout;
+  /** Live: the platform fee KDC+ keeps, in percent (the demo shows 12). */
+  commissionPct: number;
+  /** Live: hours before an earning can be paid out. */
+  clearanceHours: number;
   recordConsultation: (row: { apptId: string; patient: string; mode: Mode; fee: number }) => void;
   failPayout: (failed: FailedPayout) => void;
   clearFailedPayout: () => void;
@@ -39,11 +58,15 @@ export const earningDates = (rows: EarningRow[]) => Array.from(new Set(rows.map(
 export const useEarnings = create<EarningsState>()(
   persist(
     (set) => ({
-      summary: seed.earnings(),
-      rows: seed.earningRows(),
-      payout: seed.payout(),
+      summary: LIVE ? EMPTY_SUMMARY : seed.earnings(),
+      rows: LIVE ? [] : seed.earningRows(),
+      payout: LIVE ? EMPTY_PAYOUT : seed.payout(),
+      commissionPct: 12,
+      clearanceHours: 48,
+      // Live: the server writes earnings (and payout failures); the app reloads them instead.
       recordConsultation: ({ apptId, patient, mode, fee }) =>
         set((s) => {
+          if (LIVE) return s;
           const consultsThisMonth = s.summary.consultsThisMonth + 1;
           const month = s.summary.month + fee;
           return {
@@ -63,9 +86,9 @@ export const useEarnings = create<EarningsState>()(
             payout: { ...s.payout, pending: s.payout.pending + fee },
           };
         }),
-      failPayout: (failed) => set((s) => ({ payout: { ...s.payout, failed } })),
-      clearFailedPayout: () => set((s) => ({ payout: { ...s.payout, failed: undefined } })),
+      failPayout: (failed) => set((s) => (LIVE ? s : { payout: { ...s.payout, failed } })),
+      clearFailedPayout: () => set((s) => (LIVE ? s : { payout: { ...s.payout, failed: undefined } })),
     }),
-    { name: 'earnings', storage: persistStorage, partialize: ({ summary, rows, payout }) => ({ summary, rows, payout }) },
+    { name: 'earnings', storage: persistStorage, partialize: ({ summary, rows, payout }) => (LIVE ? {} : { summary, rows, payout }) },
   ),
 );

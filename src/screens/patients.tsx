@@ -27,6 +27,8 @@ import { usePrescriptions } from '../store/prescriptions'
 import { countAwaiting, filterPatients, useRecords, type PatientFilter } from '../store/records'
 import { useSelection } from '../store/selection'
 import { showToast } from '../store/toast'
+import { LIVE } from '../services/config'
+import { loadPatient } from '../services/live/sync-records'
 import type { Report } from '../types'
 
 /* ================================================== 15 — Patient list ==== */
@@ -92,9 +94,18 @@ export function PatientsScreen() {
 
 /* =============================================== 16 — Patient profile ==== */
 
+/** Live: a patient's contact, history and reports load when opened (each read is logged on the server). */
+function useLivePatient(id: string) {
+  React.useEffect(() => {
+    if (!LIVE || !id) return
+    loadPatient(id).catch((e: unknown) => showToast(e instanceof Error ? e.message : 'Couldn’t load this patient', 'critical'))
+  }, [id])
+}
+
 export function PatientProfileScreen() {
   const nav = useNav()
   const p = useCurrentPatient()
+  useLivePatient(p.id)
   const rxCount = usePrescriptions((st) => st.summaries.filter((r) => r.patientId === p.id).length)
   const reports = useRecords((st) => st.reports)
   const patientReports = reports.filter((r) => r.patientId === p.id)
@@ -233,6 +244,7 @@ export function PatientProfileScreen() {
 export function PatientHistoryScreen() {
   const nav = useNav()
   const p = useCurrentPatient()
+  useLivePatient(p.id)
   const allHistory = useRecords((st) => st.history)
   const consultationHistory = allHistory.filter((c) => c.patientId === p.id)
 
@@ -354,6 +366,7 @@ export function PatientPrescriptionsScreen() {
 export function ReportsScreen() {
   const nav = useNav()
   const p = useCurrentPatient()
+  useLivePatient(p.id)
   const allReports = useRecords((st) => st.reports)
   const reports = allReports.filter((r) => r.patientId === p.id)
   const groups = ['Blood Tests', 'Imaging'] as const
