@@ -37,7 +37,7 @@ import { useSelection } from '../store/selection'
 import { appointmentsForTab, appointmentsOnDay, blockedDayKeys, isToday, NO_FILTERS, tabCount, type ApptFilters, type ApptTab } from '../store/selectors'
 import { showToast } from '../store/toast'
 import type { Appointment, Mode } from '../types'
-import { addDays, dateOptions, keyOfLabel, longDate, monthYear, parseKey, TIME_OPTIONS, TODAY_KEY, toKey } from '../utils/date'
+import { addDays, dateOptions, fullDate, keyOfLabel, longDate, monthYear, parseKey, TIME_OPTIONS, TODAY_KEY, toKey } from '../utils/date'
 
 /* ============================================ 09 — Appointment list ======= */
 
@@ -79,7 +79,7 @@ export function AppointmentListScreen() {
         <Div className="flex-row items-end justify-between px-5 pb-3 pt-4">
           <Div>
             <P className="text-title-lg text-ink-900">Appointments</P>
-            <P className="mt-0.5 text-body-sm text-ink-500">Monday, 5 October 2026</P>
+            <P className="mt-0.5 text-body-sm text-ink-500">{fullDate(TODAY_KEY)}</P>
           </Div>
           <Div className="flex-row gap-1.5">
             <IconButton size={36} label="Calendar" onClick={() => nav.navigate('dr-calendar')}>
@@ -580,7 +580,7 @@ export function CalendarScreen() {
         </Card>
 
         <Div>
-          <SectionHeader title={isTodaySelected ? 'Monday, 5 October' : longDate(selected)} subtitle={subtitle} className="!px-0 pb-2.5" />
+          <SectionHeader title={isTodaySelected ? fullDate(TODAY_KEY, false) : longDate(selected)} subtitle={subtitle} className="!px-0 pb-2.5" />
           <Div className="gap-2.5">
             {(isTodaySelected ? appointments.filter(isToday).slice(0, 4) : dayAppts).map((x) => (
               <ApptCard

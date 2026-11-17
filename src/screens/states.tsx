@@ -41,6 +41,7 @@ import { useNotifications } from '../store/notifications'
 import { usePrescriptions } from '../store/prescriptions'
 import { useRecords } from '../store/records'
 import { LIVE } from '../services/config'
+import { fullDate, TODAY_KEY } from '../utils/date'
 import { ServiceError } from '../services'
 import { syncAll } from '../services/live/sync'
 import { useVerification } from '../store/verification'
@@ -168,7 +169,7 @@ export function NoAppointmentsScreen() {
       <Div className="bg-white" style={{ marginTop: -DEVICE.safeTop, paddingTop: DEVICE.safeTop }}>
         <Div className="px-5 pb-3 pt-4">
           <P className="text-title-lg text-ink-900">Appointments</P>
-          <P className="mt-0.5 text-body-sm text-ink-500">Sunday, 11 October 2026</P>
+          <P className="mt-0.5 text-body-sm text-ink-500">{LIVE ? fullDate(TODAY_KEY) : 'Sunday, 11 October 2026'}</P>
         </Div>
         <Div className="px-5 pb-3.5">
           <Segmented
@@ -495,19 +496,20 @@ export function NoShowScreen() {
 
 export function PaymentPendingScreen() {
   const pending = useEarnings((st) => st.payout.pending)
+  const next = useEarnings((st) => st.payout.nextPayout)
   return (
     <StateScreen title="Earnings" tab="earnings">
       <StateBlock
         tone="caution"
         icon={<Clock className="h-[30px] w-[30px]" strokeWidth={1.8} />}
         title="Settlement in progress"
-        body={`${rupee(pending)} from 14 consultations is clearing. It is released 48 hours after each consultation closes.`}
+        body={LIVE ? `${rupee(pending)} is clearing. It is released 48 hours after each consultation closes.` : `${rupee(pending)} from 14 consultations is clearing. It is released 48 hours after each consultation closes.`}
       />
       <Div className="mt-7 px-5">
         <Card elevation="tile">
           <KeyValue label="Clearing" value={rupee(pending)} />
-          <KeyValue label="Consultations" value="14" />
-          <KeyValue label="Expected" value="Wed, 8 Oct 2026" tone="success" />
+          {!LIVE && <KeyValue label="Consultations" value="14" />}
+          <KeyValue label="Expected" value={LIVE ? next.date : 'Wed, 8 Oct 2026'} tone="success" />
         </Card>
       </Div>
     </StateScreen>

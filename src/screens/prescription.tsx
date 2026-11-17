@@ -42,6 +42,8 @@ import { useSelection } from '../store/selection'
 import { nextUpcoming } from '../store/selectors'
 import { showToast } from '../store/toast'
 import { injectFailure } from '../services'
+import { LIVE } from '../services/config'
+import { useEarnings } from '../store/earnings'
 import type { CatalogMedicine, Mode, PrescribedMedicine } from '../types'
 import { addDays, dateOptions, dayMonthLong, keyOfLabel, longDate, TODAY_KEY } from '../utils/date'
 import { followUpSchema, type FollowUpForm } from '../validation/schemas'
@@ -839,6 +841,8 @@ export function ConsultCompleteScreen() {
   const appointments = useAppointments((st) => st.appointments)
   const active = useConsultation((st) => st.active)
   const clearActive = useConsultation((st) => st.clearActive)
+  // Live: the consultation's fee settles with the next payout cycle.
+  const nextPayout = useEarnings((st) => st.payout.nextPayout.date)
   if (!rx) return <Screen background="bg-white" padBottom={false}><Div /></Screen>
 
   const appt = appointments.find((a) => a.id === rx.apptId)
@@ -875,7 +879,7 @@ export function ConsultCompleteScreen() {
             { label: 'Clinical notes', value: 'Saved', done: true },
             { label: 'Prescription', value: rx.medicines.length ? `${rx.medicines.length} medicines sent` : 'None', done: rx.medicines.length > 0 },
             { label: 'Follow-up', value: rx.followUp.required ? rx.followUp.date : 'Not required', done: true },
-            { label: 'Settlement', value: 'Wed, 8 Oct', done: false },
+            { label: 'Settlement', value: LIVE ? nextPayout : 'Wed, 8 Oct', done: false },
           ].map((r, i, arr) => (
             <Div key={r.label} className={`flex-row items-center gap-3 px-4 py-3 ${i < arr.length - 1 ? 'border-b-[0.5px] border-ink-900/10' : ''}`}>
               <Span

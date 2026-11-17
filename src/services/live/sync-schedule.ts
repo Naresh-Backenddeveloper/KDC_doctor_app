@@ -185,9 +185,9 @@ export async function loadAvailability(): Promise<void> {
   useAvailability.setState({
     week,
     duration: s.slotMinutes,
-    // No break saved: the blueprint's default lunch hour is shown; saving keeps it.
-    breakFrom: s.breakFrom ? from24(s.breakFrom) : '01:00 PM',
-    breakTo: s.breakTo ? from24(s.breakTo) : '02:00 PM',
+    // No break saved: none is shown (patients can book those hours), and saving keeps it that way.
+    breakFrom: s.breakFrom ? from24(s.breakFrom) : '',
+    breakTo: s.breakTo ? from24(s.breakTo) : '',
     modesOffered: offered.length ? offered : ['video', 'audio', 'clinic'],
   });
   useAppointments.setState({ onDuty: s.onDuty });

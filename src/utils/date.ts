@@ -105,3 +105,25 @@ export function nowTime(): string {
   const h = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12;
   return `${h}:${String(d.getMinutes()).padStart(2, '0')} ${d.getHours() >= 12 ? 'PM' : 'AM'}`;
 }
+
+const FULL_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** "Monday, 5 October 2026" (`withYear` false: "Monday, 5 October") */
+export function fullDate(key: string, withYear = true): string {
+  const d = parseKey(key);
+  return `${FULL_WEEKDAYS[d.getDay()]}, ${d.getDate()} ${FULL_MONTHS[d.getMonth()]}${withYear ? ` ${d.getFullYear()}` : ''}`;
+}
+
+/** The "Today · Mon, 5 Oct" label: the real date live, the blueprint's in the demo. */
+export function todayHeader(): string {
+  if (!LIVE) return 'Today · Mon, 5 Oct';
+  const d = parseKey(TODAY_KEY);
+  return `Today · ${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
+/** Live: by the time of day; the demo always says good morning. */
+export function greeting(now = new Date()): string {
+  if (!LIVE) return 'Good morning';
+  const h = now.getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+}

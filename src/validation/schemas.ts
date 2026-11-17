@@ -149,7 +149,10 @@ export const scheduleSchema = z
     modesOffered: z.array(z.enum(['video', 'audio', 'clinic'])).min(1, 'Offer at least one consultation type'),
   })
   .superRefine((v, ctx) => {
-    if (minutesOf(v.breakTo) <= minutesOf(v.breakFrom)) {
+    // No break is allowed (both empty); a break needs both ends, the end after the start.
+    if (Boolean(v.breakFrom) !== Boolean(v.breakTo)) {
+      ctx.addIssue({ code: 'custom', message: 'Choose both a start and an end for the break', path: ['breakTo'] });
+    } else if (v.breakFrom && minutesOf(v.breakTo) <= minutesOf(v.breakFrom)) {
       ctx.addIssue({ code: 'custom', message: 'Break must end after it starts', path: ['breakTo'] });
     }
     v.days.forEach((d, i) => {

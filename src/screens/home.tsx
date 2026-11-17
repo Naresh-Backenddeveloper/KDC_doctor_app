@@ -34,7 +34,7 @@ import { acceptRequest, openPrescriptionForPatient, roomFor, selectAppointment, 
 import { useNotifications } from '../store/notifications'
 import { countAwaiting, useRecords } from '../store/records'
 import { nextUpcoming, summarize, todaysAppointments } from '../store/selectors'
-import { minutesOf } from '../utils/date'
+import { greeting, minutesOf, todayHeader } from '../utils/date'
 import type { Appointment, PendingAction } from '../types'
 
 const QUICK = [
@@ -112,7 +112,7 @@ export function DoctorHomeScreen() {
               <DoctorAvatar src={doctor.photo} name={doctor.name} size={42} />
             </Btn>
             <Div className="min-w-0 flex-1">
-              <P className="text-caption text-white/50">Good morning</P>
+              <P className="text-caption text-white/50">{greeting()}</P>
               <P className="truncate text-title-sm text-white">{doctor.shortName}</P>
             </Div>
             <DutyPill on={onDuty} onClick={toggleDuty} />
@@ -130,7 +130,7 @@ export function DoctorHomeScreen() {
           {/* Today at a glance — the three-second read */}
           <Div className="mt-5">
             <Div className="flex-row items-baseline justify-between">
-              <P className="text-[11px] font-bold uppercase tracking-[.1em] text-white/45">Today · Mon, 5 Oct</P>
+              <P className="text-[11px] font-bold uppercase tracking-[.1em] text-white/45">{todayHeader()}</P>
               <Btn
                 onPress={() => nav.navigate('dr-appointments', { tab: 'appointments' })}
                 className="tap text-caption font-semibold text-white/70"

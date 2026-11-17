@@ -33,7 +33,7 @@ import { useSelection } from '../store/selection'
 import { affectedByBlock, bookedThisWeek, slotSummary, todaysAppointments } from '../store/selectors'
 import { showToast } from '../store/toast'
 import type { Mode, WorkingDay } from '../types'
-import { addDays, dateOptions, daysBetween, keyOfLabel, longDate, shortDate, TIME_OPTIONS } from '../utils/date'
+import { addDays, dateOptions, daysBetween, keyOfLabel, longDate, shortDate, TIME_OPTIONS, todayHeader } from '../utils/date'
 import { blockTimeSchema, scheduleSchema, type BlockTimeForm, type ScheduleForm } from '../validation/schemas'
 
 /* ============================================== 12 — My availability ====== */
@@ -73,7 +73,7 @@ export function AvailabilityScreen() {
         {/* Today */}
         <Card elevation="tile">
           <Div className="flex-row items-baseline justify-between">
-            <P className="text-[11px] font-bold uppercase tracking-[.08em] text-ink-500">Today · Mon, 5 Oct</P>
+            <P className="text-[11px] font-bold uppercase tracking-[.08em] text-ink-500">{todayHeader()}</P>
             <Span className="text-caption font-semibold text-vital-700">{todaySlots.open} slots open</Span>
           </Div>
 
