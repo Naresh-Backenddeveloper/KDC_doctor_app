@@ -46,6 +46,7 @@ import { useNav } from '../navigation/navigation'
 import { Linking } from 'react-native'
 import { useController } from 'react-hook-form'
 import { pickDocument } from '../platform/imagePicker'
+import { useAvailability } from '../store/availability'
 import { useBank } from '../store/bank'
 import { useDoctor } from '../store/doctor'
 import { saveBankDetails, selectAppointment } from '../store/flows'
@@ -56,7 +57,7 @@ import { useSettings } from '../store/settings'
 import { useSupport } from '../store/support'
 import { showToast } from '../store/toast'
 import { services } from '../services'
-import type { DoctorNotification, Mode, NotificationCategory, Qualification, SettingsState } from '../types'
+import type { DoctorNotification, Mode, NotificationCategory, Qualification, SettingsState, SupportTicket, WorkingDay } from '../types'
 import {
   bankSchema, clinicSchema, digits, feesSchema, netEarning, panSchema, passwordSchema, professionalInfoSchema, qualificationSchema,
   ticketSchema, type BankForm, type FeesForm,
@@ -140,17 +141,29 @@ export function NotificationsScreen() {
   )
 }
 
+/** Live: "Mon–Sat · 6 working days", "Every day · 7 working days" or "Mon, Wed, Fri · 3 working days". */
+function workingDays(week: WorkingDay[]): string {
+  const on = week.map((d, i) => (d.on && d.sessions.length ? i : -1)).filter((i) => i >= 0)
+  if (!on.length) return 'No working days set'
+  const count = `${on.length} working day${on.length === 1 ? '' : 's'}`
+  if (on.length === 7) return `Every day · ${count}`
+  const run = on.every((d, k) => k === 0 || d === on[k - 1] + 1)
+  const days = run && on.length > 2 ? `${week[on[0]].short}–${week[on[on.length - 1]].short}` : on.map((i) => week[i].short).join(', ')
+  return `${days} · ${count}`
+}
+
 /* ============================================== 35 — Doctor profile ====== */
 
 export function ProfileScreen() {
   const nav = useNav()
   const doctor = useDoctor((st) => st.profile)
   const bank = useBank((st) => st.bank)
+  const week = useAvailability((st) => st.week)
 
   const practice = [
     { Icon: Stethoscope, label: 'Professional information', sub: 'Qualifications and registration', screen: 'dr-professional-info' },
     { Icon: IndianRupee, label: 'Consultation fees', sub: `${rupee(doctor.fees.audio)} – ${rupee(doctor.fees.clinic)}`, screen: 'dr-fees' },
-    { Icon: CalendarClock, label: 'Availability', sub: 'Mon–Sat · 6 working days', screen: 'dr-availability' },
+    { Icon: CalendarClock, label: 'Availability', sub: LIVE ? workingDays(week) : 'Mon–Sat · 6 working days', screen: 'dr-availability' },
     { Icon: Building2, label: 'Clinic information', sub: doctor.hospital, screen: 'dr-clinic' },
     { Icon: Landmark, label: 'Bank details', sub: bank.account ? `${bank.name} ${bank.account}` : 'Add your settlement account', screen: 'dr-bank' },
   ]
@@ -973,6 +986,9 @@ const FAQS = [
   { q: 'Can I consult outside my listed availability?', a: 'Yes, by adding a session on the Edit schedule screen. Patients only see open slots within your sessions.' },
 ]
 
+/** Live: what the ticket screen shows when the ticket isn't loaded (none yet, or after sign-out). */
+const NO_TICKET: SupportTicket = { id: '', subject: '', status: 'open', priority: '', created: '', updated: '', thread: [] }
+
 export function SupportScreen() {
   const nav = useNav()
   const tickets = useSupport((st) => st.tickets)
@@ -1004,8 +1020,8 @@ export function SupportScreen() {
         <P className="text-title-md text-ink-900">How can we help?</P>
         <P className="mt-1 text-body text-ink-500">Priority support for practising clinicians, 24 × 7.</P>
 
-        {/* Open ticket surfaces first */}
-        <Btn
+        {/* Open ticket surfaces first (live: a new doctor has none) */}
+        {ticket && <Btn
           onPress={() => openTicket(ticket.id)}
           className="tap mt-4 flex-row w-full items-center gap-3.5 rounded-tile bg-white p-4 text-left shadow-tile ring-[1.5px] ring-inset  ring-brand-200"
         >
@@ -1015,13 +1031,13 @@ export function SupportScreen() {
           <Div className="min-w-0 flex-1">
             <P className="truncate text-body-lg font-semibold text-ink-900">{ticket.subject}</P>
             <P className="truncate text-caption tabular-nums text-ink-400">
-              {ticket.id} · updated {ticket.updated.split(',')[1]}
+              {ticket.id} · updated {ticket.updated.split(',')[1] ?? ticket.updated}
             </P>
           </Div>
           <StatusBadge tone="brand" dot>
             Open
           </StatusBadge>
-        </Btn>
+        </Btn>}
 
         <Div className="mt-5">
           <SectionHeader title="Browse topics" className="!px-0 pb-2.5" />
@@ -1124,7 +1140,7 @@ export function TicketScreen() {
   const tickets = useSupport((st) => st.tickets)
   const ticketId = useSelection((st) => st.ticketId)
   const reply = useSupport((st) => st.reply)
-  const t = tickets.find((x) => x.id === ticketId) ?? tickets[0]
+  const t = tickets.find((x) => x.id === ticketId) ?? tickets[0] ?? NO_TICKET
   const [draft, setDraft] = React.useState('')
   const [sending, setSending] = React.useState(false)
 

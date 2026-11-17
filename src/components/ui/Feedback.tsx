@@ -1,6 +1,6 @@
 import { Btn, Div, P, Span } from '../primitives/index'
 import React from 'react'
-import { KeyboardAvoidingView, Modal as RNModal, Platform } from 'react-native'
+import { KeyboardAvoidingView, Modal as RNModal } from 'react-native'
 import { FrameBox } from './DeviceFrame'
 import { Check, X, Info, AlertTriangle, Loader2 } from '../primitives/icons'
 import { DEVICE } from './Screen'
@@ -170,7 +170,7 @@ export function BottomSheet({
 }) {
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 50 }}
     >
     <Div className="flex-1 flex-col justify-end">

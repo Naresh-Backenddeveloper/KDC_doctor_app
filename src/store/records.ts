@@ -24,6 +24,17 @@ export const emptyPatient = (id: string): Patient => ({
   id, name: '', age: 0, gender: 'Male', blood: '', mobileMasked: '', city: '', conditions: [], allergies: [], lastConsult: '', consults: 0, since: '',
 });
 
+/**
+ * The same blank object for the same id, every time. Screens read patientById inside a store
+ * selector, and a new object on every read makes React re-render until it gives up (a crash).
+ */
+const blanks = new Map<string, Patient>();
+const blankPatient = (id: string) => {
+  let p = blanks.get(id);
+  if (!p) blanks.set(id, (p = emptyPatient(id)));
+  return p;
+};
+
 const FALLBACK = LIVE ? emptyPatient('') : seed.patients()[0];
 
 export function filterPatients(patients: Patient[], query: string, filter: PatientFilter) {
@@ -54,7 +65,7 @@ export const useRecords = create<RecordsState>()(
       reports: LIVE ? [] : seed.reports(),
       history: LIVE ? [] : seed.history(),
       reportDetails: LIVE ? {} : seed.reportDetails(),
-      patientById: (id) => get().patients.find((p) => p.id === id) ?? (LIVE ? emptyPatient(id) : FALLBACK),
+      patientById: (id) => get().patients.find((p) => p.id === id) ?? (LIVE ? blankPatient(id) : FALLBACK),
       markReportReviewed: async (id, note) => {
         await services.records.markReportReviewed(id, note);
         set((s) => ({ reports: s.reports.map((r) => (r.id === id ? { ...r, status: 'reviewed', note } : r)) }));
