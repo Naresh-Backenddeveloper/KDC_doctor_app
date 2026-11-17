@@ -37,7 +37,8 @@ import { useSelection } from '../store/selection'
 import { appointmentsForTab, appointmentsOnDay, blockedDayKeys, isToday, NO_FILTERS, tabCount, type ApptFilters, type ApptTab } from '../store/selectors'
 import { showToast } from '../store/toast'
 import type { Appointment, Mode } from '../types'
-import { addDays, dateOptions, fullDate, keyOfLabel, longDate, monthYear, parseKey, TIME_OPTIONS, TODAY_KEY, toKey } from '../utils/date'
+import { LIVE } from '../services/config'
+import { addDays, dateOptions, fullDate, keyOfLabel, minutesOf, longDate, monthYear, parseKey, TIME_OPTIONS, TODAY_KEY, toKey } from '../utils/date'
 
 /* ============================================ 09 — Appointment list ======= */
 
@@ -49,7 +50,11 @@ export function AppointmentListScreen() {
   const [filterOpen, setFilterOpen] = React.useState(false)
   const list = appointmentsForTab(appointments, tab, filters)
   const waiting = list.filter((a) => a.status === 'waiting' || a.status === 'in-progress')
-  const upcoming = list.filter((a) => a.status === 'upcoming')
+  const booked = list.filter((a) => a.status === 'upcoming')
+  // Live: today's appointments whose start has passed are due now, not "later today".
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+  const due = LIVE ? booked.filter((a) => a.dateKey === TODAY_KEY && minutesOf(a.time) <= nowMin) : []
+  const upcoming = booked.filter((a) => !due.includes(a))
   const completed = list.filter((a) => a.status === 'completed')
   const cancelled = list.filter((a) => a.status === 'cancelled' || a.status === 'no-show')
 
@@ -122,6 +127,12 @@ export function AppointmentListScreen() {
               <Div>
                 <GroupLabel label="Waiting now" count={waiting.length} tone="caution" />
                 <Div className="gap-2.5">{waiting.map((a) => card(a))}</Div>
+              </Div>
+            )}
+            {due.length > 0 && (
+              <Div>
+                <GroupLabel label="Due now" count={due.length} tone="caution" />
+                <Div className="gap-2.5">{due.map((a) => card(a))}</Div>
               </Div>
             )}
             {upcoming.length > 0 && (
@@ -269,7 +280,8 @@ export function AppointmentDetailScreen() {
             <Div className="min-w-0 flex-1">
               <P className="truncate text-title-md text-ink-900">{p.name}</P>
               <PatientMeta patient={p} extra={p.blood} />
-              <P className="mt-0.5 truncate text-caption tabular-nums text-ink-400">{p.id}</P>
+              {/* Demo: the blueprint's patient ID. Live: the member's internal number means nothing to a doctor. */}
+              {!LIVE && <P className="mt-0.5 truncate text-caption tabular-nums text-ink-400">{p.id}</P>}
             </Div>
             <ChevronRight className="h-[18px] w-[18px] shrink-0 text-ink-300" />
           </Btn>
@@ -320,6 +332,7 @@ export function AppointmentDetailScreen() {
             {p.conditions.map((c) => (
               <MetaChip key={c}>{c}</MetaChip>
             ))}
+            {p.conditions.length === 0 && <P className="text-body text-ink-400">None recorded</P>}
           </Div>
         </Card>
 

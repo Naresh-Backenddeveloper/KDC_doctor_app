@@ -39,9 +39,10 @@ import { useEarnings } from '../store/earnings'
 import { loadSchedule, markNoShow, notifyRunningLate, sendPrescription, setOnDuty } from '../store/flows'
 import { useNotifications } from '../store/notifications'
 import { usePrescriptions } from '../store/prescriptions'
-import { useRecords } from '../store/records'
+import { emptyPatient, useRecords } from '../store/records'
 import { LIVE } from '../services/config'
-import { fullDate, TODAY_KEY } from '../utils/date'
+import { fullDate, minutesOf, nowTime, timeLabel, TODAY_KEY } from '../utils/date'
+import { minutesBehind } from '../services/live/flows-schedule'
 import { ServiceError } from '../services'
 import { syncAll } from '../services/live/sync'
 import { useVerification } from '../store/verification'
@@ -401,7 +402,7 @@ export function PatientCancelledScreen() {
         <Div className="mt-7 px-6">
           <Card elevation="tile">
             <KeyValue label="Appointment" value={appt?.id ?? 'KDC-AP-88412'} />
-            <KeyValue label="Cancelled at" value="10:48 AM" />
+            <KeyValue label="Cancelled at" value={LIVE ? nowTime() : '10:48 AM'} />
             <Divider className="my-2.5" />
             <KeyValue label="Consultation fee" value={rupee(appt?.fee ?? 800)} />
             {!appt && <KeyValue label="Late-cancellation credit" value={rupee(400)} tone="success" strong />}
@@ -428,6 +429,12 @@ export function PatientCancelledScreen() {
 
 /* ---------------------------------------------------------- D12 No-show */
 
+/** Live: whole minutes since an appointment's start (0 before it, or on another day). */
+function minutesSince(appt: { dateKey: string; time: string }, now = new Date()): number {
+  if (appt.dateKey !== TODAY_KEY || !appt.time) return 0
+  return Math.max(0, now.getHours() * 60 + now.getMinutes() - minutesOf(appt.time))
+}
+
 export function NoShowScreen() {
   const nav = useNav()
   const [calling, setCalling] = React.useState(false)
@@ -446,7 +453,7 @@ export function NoShowScreen() {
           tone="caution"
           icon={<UserX className="h-[31px] w-[31px]" strokeWidth={1.8} />}
           title="Patient did not join"
-          body={`${p.name} has not entered the waiting room 10 minutes after the scheduled start. Two reminders have been sent.`}
+          body={LIVE ? `${p.name} hasn’t joined. The consultation was due at ${appt.time}, ${minutesSince(appt)} minutes ago.` : `${p.name} has not entered the waiting room 10 minutes after the scheduled start. Two reminders have been sent.`}
         />
         <Div className="mt-7 px-6">
           <Card elevation="tile">
@@ -462,7 +469,7 @@ export function NoShowScreen() {
             </Div>
             <Divider className="my-3" />
             <KeyValue label="Scheduled" value={appt.time} />
-            <KeyValue label="Waiting" value="10 min 24 sec" />
+            <KeyValue label="Waiting" value={LIVE ? `${minutesSince(appt)} min` : '10 min 24 sec'} />
           </Card>
         </Div>
       </Div>
@@ -718,6 +725,17 @@ export function PatientNotJoinedScreen() {
 
 export function RunningLateScreen() {
   const nav = useNav()
+  const appointments = useAppointments((st) => st.appointments)
+  const people = useRecords((st) => st.patients)
+  // Live: how late, and today's remaining patients (they're the ones told the new times).
+  const minutes = LIVE ? minutesBehind() : 22
+  const affected = LIVE
+    ? appointments.filter((a) => a.dateKey === TODAY_KEY && a.status === 'upcoming').sort((a, b) => minutesOf(a.time) - minutesOf(b.time))
+    : []
+  const rows = LIVE
+    ? affected.map((a) => ({ id: a.id, patient: people.find((x) => x.id === a.patientId) ?? emptyPatient(a.patientId), from: a.time, to: timeLabel(minutesOf(a.time) + minutes) }))
+    : patients.slice(0, 3).map((p, i) => ({ id: p.id, patient: p, from: ['5:30 PM', '6:15 PM', '7:00 PM'][i], to: ['5:52 PM', '6:37 PM', '7:22 PM'][i] }))
+  const count = rows.length
   return (
     <Screen background="bg-canvas" padBottom={false}>
       <ScreenHeader title="Today" />
@@ -725,22 +743,22 @@ export function RunningLateScreen() {
         <StateBlock
           tone="caution"
           icon={<Timer className="h-[30px] w-[30px]" strokeWidth={1.8} />}
-          title="You're running 22 minutes late"
-          body="Three patients are affected. We can let them know and offer a revised time automatically."
+          title={`You're running ${minutes} minutes late`}
+          body={LIVE ? (count ? `${count} patient${count > 1 ? 's are' : ' is'} still to be seen today. We can let them know their new times.` : 'No one else is booked for today.') : 'Three patients are affected. We can let them know and offer a revised time automatically.'}
         />
 
         <Div className="mt-7 px-5">
           <Card elevation="tile" padded={false} className="overflow-hidden">
-            {patients.slice(0, 3).map((p, i, arr) => (
-              <Div key={p.id} className={`flex-row items-center gap-3 px-4 py-3 ${i < arr.length - 1 ? 'border-b-[0.5px] border-ink-900/10' : ''}`}>
-                <PatientAvatar patient={p} size={36} />
+            {rows.map((r, i, arr) => (
+              <Div key={r.id} className={`flex-row items-center gap-3 px-4 py-3 ${i < arr.length - 1 ? 'border-b-[0.5px] border-ink-900/10' : ''}`}>
+                <PatientAvatar patient={r.patient} size={36} />
                 <Div className="min-w-0 flex-1">
-                  <P className="truncate text-body-lg font-semibold text-ink-900">{p.name}</P>
+                  <P className="truncate text-body-lg font-semibold text-ink-900">{r.patient.name}</P>
                   <P className="truncate text-caption text-ink-400">
-                    {['5:30 PM', '6:15 PM', '7:00 PM'][i]} → {['5:52 PM', '6:37 PM', '7:22 PM'][i]}
+                    {r.from} → {r.to}
                   </P>
                 </Div>
-                <StatusBadge tone="caution">+22 min</StatusBadge>
+                <StatusBadge tone="caution">+{minutes} min</StatusBadge>
               </Div>
             ))}
           </Card>
@@ -752,11 +770,11 @@ export function RunningLateScreen() {
           <Button
             onClick={async () => {
               await notifyRunningLate()
-              showToast('3 patients notified of the new times')
+              showToast(LIVE ? `${count} patient${count === 1 ? '' : 's'} notified of the new times` : '3 patients notified of the new times')
               nav.resetTo('dr-home', 'home')
             }}
           >
-            Notify all 3 patients
+            {LIVE ? (count ? `Notify ${count === 1 ? 'the patient' : `all ${count} patients`}` : 'Let patients know') : 'Notify all 3 patients'}
           </Button>
           <Button variant="text" onClick={() => nav.navigate('dr-appointments', { tab: 'appointments' })}>
             Adjust the schedule instead

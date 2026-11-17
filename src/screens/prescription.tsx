@@ -80,6 +80,15 @@ export function CreatePrescriptionScreen() {
   const investigationForm = useZodForm(entrySchema, { value: '' })
   // Live: medicine search answers arrive asynchronously; re-render when they do.
   useMedicineSearch((s) => s.version)
+  // Live: the medicines this doctor prescribed most recently; the demo keeps the blueprint's.
+  const docs = usePrescriptions((st) => st.docs)
+  const recent = React.useMemo(
+    () =>
+      LIVE
+        ? [...new Set(Object.values(docs).sort((a, b) => b.id.localeCompare(a.id)).flatMap((d) => d.medicines.map((m) => m.name)))].slice(0, 4)
+        : ['Telma 40', 'Ecosprin 75', 'Met XL 25', 'Nitrocontin 2.6'],
+    [docs],
+  )
 
   if (!rx) return <Screen background="bg-canvas" padBottom={false}><Div /></Screen>
 
@@ -90,6 +99,8 @@ export function CreatePrescriptionScreen() {
   const addFromChip = (label: string) => {
     const catalog = resolveRecentChip(label)
     if (catalog) setEditor({ catalog })
+    // Live: a medicine the catalogue on the phone doesn't know yet is looked up on the server.
+    else if (LIVE) setQuery(label)
   }
   const toReview = () => {
     if (rx.medicines.length === 0) {
@@ -225,9 +236,9 @@ export function CreatePrescriptionScreen() {
                 ))}
               </Div>
             )}
-            <Div className="mt-2.5 flex-row flex-wrap gap-1.5">
+            {recent.length > 0 && <Div className="mt-2.5 flex-row flex-wrap gap-1.5">
               <Span className="text-caption text-ink-400">Recent:</Span>
-              {['Telma 40', 'Ecosprin 75', 'Met XL 25', 'Nitrocontin 2.6'].map((m) => (
+              {recent.map((m) => (
                 <Btn
                   key={m}
                   onPress={() => addFromChip(m)}
@@ -237,7 +248,7 @@ export function CreatePrescriptionScreen() {
                   {m}
                 </Btn>
               ))}
-            </Div>
+            </Div>}
             <Button
               variant="secondary"
               size="md"
@@ -621,9 +632,11 @@ function Block({
 
 export function PrescriptionSentScreen() {
   const nav = useNav()
+  const commissionPct = useEarnings((st) => st.commissionPct)
   const { rx } = useCurrentRx()
   const patient = useRecords((st) => st.patientById(rx?.patientId ?? ''))
   const appt = useAppointments((st) => st.appointments.find((a) => a.id === rx?.apptId))
+  const netFee = Math.round((appt?.fee ?? 0) * (1 - commissionPct / 100))
   if (!rx) return <Screen background="bg-white" padBottom={false}><Div /></Screen>
 
   const nextStep = () => nav.navigate(rx.followUp.required && !rx.followUp.scheduled ? 'dr-followup' : 'dr-consult-complete')
@@ -661,7 +674,7 @@ export function PrescriptionSentScreen() {
           <Div className="p-4">
             <KeyValue label="Prescription ID" value={rx.id} />
             <KeyValue label="Date" value={rx.date} />
-            <KeyValue label="Medicines" value={`${rx.medicines.length} items`} />
+            <KeyValue label="Medicines" value={`${rx.medicines.length} ${rx.medicines.length === 1 ? 'item' : 'items'}`} />
             <KeyValue label="Follow-up" value={rx.followUp.date} tone="success" />
           </Div>
         </Card>
@@ -671,8 +684,14 @@ export function PrescriptionSentScreen() {
           <Div className="mt-2.5 gap-2">
             {[
               'Clinical notes saved to the patient record.',
-              rx.followUp.required ? `Follow-up added to your calendar for ${dayMonthLong(rx.followUp.date)}.` : 'No follow-up required for this consultation.',
-              `${rupee(appt?.fee ?? 800)} added to this week's settlement.`,
+              rx.followUp.required
+                ? LIVE
+                  ? `Follow-up advised for ${dayMonthLong(rx.followUp.date)}. The patient books it.`
+                  : `Follow-up added to your calendar for ${dayMonthLong(rx.followUp.date)}.`
+                : 'No follow-up required for this consultation.',
+              LIVE
+                ? `${rupee(netFee)} (after the ${commissionPct}% KDC+ fee) added to your next settlement.`
+                : `${rupee(appt?.fee ?? 800)} added to this week's settlement.`,
             ].map((t) => (
               <Div key={t} className="flex-row gap-2.5 text-body-sm leading-[19px] text-brand-700/90">
                 <Check className="mt-[3px] h-[13px] w-[13px] shrink-0" strokeWidth={3} />
@@ -836,6 +855,7 @@ export function FollowUpScreen() {
 
 export function ConsultCompleteScreen() {
   const nav = useNav()
+  const commissionPct = useEarnings((st) => st.commissionPct)
   const { rx } = useCurrentRx()
   const patient = useRecords((st) => st.patientById(rx?.patientId ?? ''))
   const appointments = useAppointments((st) => st.appointments)
@@ -862,7 +882,7 @@ export function ConsultCompleteScreen() {
           <P className="mt-5 text-center font-display text-[25px] font-extrabold leading-[30px] tracking-[-0.5px] text-ink-900">
             Consultation completed
           </P>
-          <P className="mt-2 text-body text-ink-500">{duration} · {rupee(fee)} earned</P>
+          <P className="mt-2 text-body text-ink-500">{duration} · {rupee(LIVE ? Math.round(fee * (1 - commissionPct / 100)) : fee)} earned</P>
         </Div>
 
         <Card elevation="tile" padded={false} className="mt-6 overflow-hidden">
@@ -877,7 +897,7 @@ export function ConsultCompleteScreen() {
           <Divider />
           {[
             { label: 'Clinical notes', value: 'Saved', done: true },
-            { label: 'Prescription', value: rx.medicines.length ? `${rx.medicines.length} medicines sent` : 'None', done: rx.medicines.length > 0 },
+            { label: 'Prescription', value: rx.medicines.length ? `${rx.medicines.length} ${rx.medicines.length === 1 ? 'medicine' : 'medicines'} sent` : 'None', done: rx.medicines.length > 0 },
             { label: 'Follow-up', value: rx.followUp.required ? rx.followUp.date : 'Not required', done: true },
             { label: 'Settlement', value: LIVE ? nextPayout : 'Wed, 8 Oct', done: false },
           ].map((r, i, arr) => (

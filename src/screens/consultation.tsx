@@ -40,6 +40,7 @@ import { useCallClock } from '../hooks/useCallClock'
 import { useConsultation } from '../store/consultation'
 import { LIVE } from '../services/config'
 import { loadNotes } from '../services/live/flows-records'
+import { useLiveSession } from '../services/live/session'
 import { useCurrentAppointment } from '../store/context'
 import { useDoctor } from '../store/doctor'
 import { beginConsultation, ensureRxDraft, selectPatient } from '../store/flows'
@@ -61,6 +62,9 @@ export function WaitingRoomScreen() {
   const camera = useConsultation((st) => st.camera)
   const toggleMic = useConsultation((st) => st.toggleMic)
   const toggleCamera = useConsultation((st) => st.toggleCamera)
+  // Live: whether the patient has joined, from the server (refreshed every few seconds).
+  const session = useLiveSession(LIVE ? appt.id : '')
+  const inRoom = !LIVE || Boolean(session?.patientInRoom)
   const checks = [
     { Icon: Camera, label: 'Camera', detail: 'FaceTime HD · 1080p', status: 'Ready' },
     { Icon: Mic, label: 'Microphone', detail: 'Input level good', status: 'Ready' },
@@ -77,7 +81,7 @@ export function WaitingRoomScreen() {
           <Div className="flex-row items-center gap-3.5 p-4">
             <Div className="relative">
               <PatientAvatar patient={patient} size={52} />
-              <Span className="absolute -bottom-0.5 -right-0.5 h-[14px] w-[14px] rounded-full bg-vital-600 ring-[2.5px] ring-white" />
+              <Span className={`absolute -bottom-0.5 -right-0.5 h-[14px] w-[14px] rounded-full ${inRoom ? 'bg-vital-600' : 'bg-ink-300'} ring-[2.5px] ring-white`} />
             </Div>
             <Div className="min-w-0 flex-1">
               <Div className="flex-row items-baseline justify-between gap-3">
@@ -85,7 +89,9 @@ export function WaitingRoomScreen() {
                 <P className="shrink-0 text-title-sm tabular-nums text-ink-900">{appt.time}</P>
               </Div>
               <PatientMeta patient={patient} extra={appt.isFollowUp ? 'Follow-up' : 'New visit'} />
-              <P className="mt-1 text-caption font-bold text-vital-700">Joined · waiting 4 min</P>
+              <P className={`mt-1 text-caption font-bold ${inRoom ? 'text-vital-700' : 'text-ink-500'}`}>
+                {!LIVE ? 'Joined · waiting 4 min' : session ? (session.patientInRoom ? 'In the waiting room' : 'Hasn’t joined yet') : 'Checking…'}
+              </P>
             </Div>
           </Div>
           <Div className="border-t border-ink-100 bg-ink-50/60 px-4 py-2.5">
@@ -95,8 +101,18 @@ export function WaitingRoomScreen() {
           </Div>
         </Div>
 
+        {/* Live: no video or audio until the provider is chosen (D5); say so instead of a camera check. */}
+        {LIVE && (
+          <Div className="mt-3 flex-row items-start gap-2.5 rounded-tile bg-caution-50 p-3.5">
+            <VideoOff className="mt-[1px] h-[16px] w-[16px] shrink-0 text-caution-700" strokeWidth={2.2} />
+            <P className="text-body-sm leading-[19px] text-caution-700">
+              Video and audio calls aren’t connected yet. Starting the consultation records it, so you can write notes and the prescription.
+            </P>
+          </Div>
+        )}
+
         {/* Self preview */}
-        <Div className="relative mt-3 overflow-hidden rounded-tile bg-ink-900" style={{ height: 172 }}>
+        {!LIVE && <Div className="relative mt-3 overflow-hidden rounded-tile bg-ink-900" style={{ height: 172 }}>
           {camera && (
             <Img
               src={doctor.photo}
@@ -123,10 +139,10 @@ export function WaitingRoomScreen() {
               ))}
             </Div>
           </Div>
-        </Div>
+        </Div>}
 
-        {/* Device checks */}
-        <Card elevation="tile" padded={false} className="mt-3 overflow-hidden">
+        {/* Device checks (demo only: there's nothing to check until calls are connected) */}
+        {!LIVE && <Card elevation="tile" padded={false} className="mt-3 overflow-hidden">
           {checks.map((c, i, arr) => (
             <Div key={c.label} className={`flex-row items-center gap-3.5 px-4 py-3 ${i < arr.length - 1 ? 'border-b-[0.5px] border-ink-900/10' : ''}`}>
               <Span className="flex-col h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] bg-vital-50">
@@ -142,14 +158,14 @@ export function WaitingRoomScreen() {
               </Span>
             </Div>
           ))}
-        </Card>
+        </Card>}
 
-        <Div className="mt-3 flex-row items-start gap-2.5 rounded-tile bg-brand-50 p-3.5">
+        {!LIVE && <Div className="mt-3 flex-row items-start gap-2.5 rounded-tile bg-brand-50 p-3.5">
           <ShieldCheck className="mt-[1px] h-[16px] w-[16px] shrink-0 text-brand-600" strokeWidth={2.2} />
           <P className="text-body-sm leading-[19px] text-brand-700">
             End-to-end encrypted. Consultations are not recorded unless both you and the patient consent.
           </P>
-        </Div>
+        </Div>}
       </Div>
 
       <StickyBar>
@@ -243,6 +259,15 @@ export function VideoCallScreen() {
           style={{ background: 'linear-gradient(0deg, rgba(5,12,20,.93) 0%, rgba(5,12,20,.66) 38%, rgba(5,12,20,0) 100%)' }}
         />
 
+        {/* Live: no video until the provider is chosen (D5) — said plainly, not a black screen */}
+        {LIVE && (
+          <Div className="absolute inset-x-8 top-[38%] flex-col items-center gap-2">
+            <VideoOff className="h-[28px] w-[28px] text-white/60" strokeWidth={1.8} />
+            <P className="text-center text-body-lg font-semibold text-white">Video isn’t connected yet</P>
+            <P className="text-center text-body-sm leading-[19px] text-white/60">The consultation is recorded. Use Notes and Prescribe below.</P>
+          </Div>
+        )}
+
         {/* Top chrome — patient identity, because the doctor needs it, not branding */}
         <Div className="absolute inset-x-0 px-5" style={{ top: DEVICE.safeTop + 2 }}>
           <Div className="flex-row items-start justify-between gap-3">
@@ -253,10 +278,10 @@ export function VideoCallScreen() {
               </P>
             </Div>
             <Div className="flex-row shrink-0 items-center gap-2">
-              <Span className="flex-row items-center gap-1.5 rounded-chip bg-black/35 px-2.5 py-1.5 ">
+              {!LIVE && <Span className="flex-row items-center gap-1.5 rounded-chip bg-black/35 px-2.5 py-1.5 ">
                 <SignalHigh className="h-[13px] w-[13px] text-vital-500" strokeWidth={2.6} />
                 <Span className="text-caption font-semibold text-white">HD</Span>
-              </Span>
+              </Span>}
               <Span className="flex-row items-center gap-1.5 rounded-chip bg-black/35 px-2.5 py-1.5 tabular-nums ">
                 <Span className="h-[6px] w-[6px] rounded-full bg-critical-500" />
                 <Span className="text-caption font-bold text-white">{clock(seconds)}</Span>
@@ -390,7 +415,7 @@ export function AudioCallScreen() {
 
           <Div className="mt-3.5 flex-row items-center gap-2 text-body-sm text-white/50">
             <SignalHigh className="h-[14px] w-[14px] text-vital-400" strokeWidth={2.4} />
-            Connection stable · HD voice
+            {LIVE ? 'Audio isn’t connected yet · notes and prescription work' : 'Connection stable · HD voice'}
           </Div>
         </Div>
 

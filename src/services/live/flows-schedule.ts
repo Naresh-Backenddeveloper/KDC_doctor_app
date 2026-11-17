@@ -49,7 +49,12 @@ export function beginConsultation(apptId: string): string {
   useSelection.getState().select({ apptId, patientId: appt?.patientId ?? null, rxKey: apptId, viewRxId: null });
   useAppointments.getState().patch(apptId, { status: 'in-progress', requested: false });
   useConsultation.getState().startCall(apptId);
-  api.post(`doctor/consultations/${encodeURIComponent(apptId)}/start`, {}).then(refresh, (e) => {
+  api.post<{ session?: { startedAt: string | null } }>(`doctor/consultations/${encodeURIComponent(apptId)}/start`, {}).then((r) => {
+    // A rejoin carries on the server's clock (the phone's started again from zero).
+    const started = r?.session?.startedAt ? Date.parse(r.session.startedAt) : NaN;
+    if (Number.isFinite(started)) useConsultation.setState((s) => (s.active?.apptId === apptId ? { active: { ...s.active, startedAt: started } } : s));
+    refresh();
+  }, (e) => {
     showToast(messageOf(e, 'Couldn’t start the consultation'), 'critical');
     refresh();
   });
@@ -90,7 +95,7 @@ export async function rescheduleAppointment(apptId: string, target: { key: strin
 }
 
 /** How far behind the first of today's patients who should have been seen by now is. */
-function minutesBehind(now = new Date()): number {
+export function minutesBehind(now = new Date()): number {
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const overdue = useAppointments.getState().appointments.filter((a) => a.dateKey === TODAY_KEY && a.status === 'upcoming' && minutesOf(a.time) < nowMin);
   if (!overdue.length) return 15;

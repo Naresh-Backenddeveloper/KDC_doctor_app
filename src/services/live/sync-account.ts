@@ -9,6 +9,7 @@ import { useBank } from '../../store/bank';
 import { useDoctor, EMPTY_PROFILE } from '../../store/doctor';
 import { useEarnings, EMPTY_PAYOUT, EMPTY_SUMMARY } from '../../store/earnings';
 import { useNotifications } from '../../store/notifications';
+import { useSettings } from '../../store/settings';
 import { useSupport } from '../../store/support';
 import { EMPTY_DECLARED, useVerification } from '../../store/verification';
 import type {
@@ -397,9 +398,38 @@ export async function loadTicket(id: string): Promise<SupportTicket> {
  * The account, loaded at sign-in and on launch. Verification first: everything past it
  * (earnings, bank) belongs to an approved doctor, and is skipped quietly before then.
  */
+/** The server's names for the settings screen's switches (GET/PUT /me/preferences). */
+export const PREFERENCE_KEYS = {
+  apptBooked: 'appointmentBooked',
+  patientWaiting: 'patientWaiting',
+  apptCancelled: 'appointmentCancelled',
+  reportUploaded: 'reportUploaded',
+  payoutCredited: 'payoutCredited',
+  productUpdates: 'productUpdates',
+} as const;
+
+interface ApiPreferences {
+  language?: string;
+  security?: { biometricLock?: boolean };
+  notifications?: Partial<Record<(typeof PREFERENCE_KEYS)[keyof typeof PREFERENCE_KEYS], boolean>>;
+}
+
+/** The doctor's notification switches, biometric lock and language, saved on the server. */
+export async function loadPreferences(): Promise<void> {
+  const p = await api.get<ApiPreferences>('me/preferences');
+  const next: Partial<Record<string, boolean | string>> = {};
+  for (const [local, remote] of Object.entries(PREFERENCE_KEYS)) {
+    const v = p.notifications?.[remote];
+    if (typeof v === 'boolean') next[local] = v;
+  }
+  if (typeof p.security?.biometricLock === 'boolean') next.biometricLock = p.security.biometricLock;
+  if (p.language) next.language = p.language;
+  useSettings.setState(next);
+}
+
 export async function loadAccount(): Promise<void> {
   await Promise.all([loadProfile(), loadVerification()]);
-  await Promise.all([loadEarnings().catch(() => undefined), loadBank().catch(() => undefined), loadNotifications(), loadTickets()]);
+  await Promise.all([loadEarnings().catch(() => undefined), loadBank().catch(() => undefined), loadNotifications(), loadTickets(), loadPreferences().catch(() => undefined)]);
 }
 
 export function clearAccount() {

@@ -31,7 +31,7 @@ import {
   Check,
   BellOff,
 } from '../components/primitives/icons'
-import { Screen, DEVICE } from '../components/ui/Screen'
+import { Screen, DEVICE, isTablet } from '../components/ui/Screen'
 import { ScreenHeader, HScroll } from '../components/ui/Nav'
 import { Button, IconButton, StickyBar } from '../components/ui/Button'
 import { Field, Input, RadioRow, SearchInput, Toggle } from '../components/ui/Inputs'
@@ -156,6 +156,7 @@ function workingDays(week: WorkingDay[]): string {
 
 export function ProfileScreen() {
   const nav = useNav()
+  const tablet = isTablet()
   const doctor = useDoctor((st) => st.profile)
   const bank = useBank((st) => st.bank)
   const week = useAvailability((st) => st.week)
@@ -178,29 +179,29 @@ export function ProfileScreen() {
     <Screen background="bg-canvas" padTop={false} padBottom={false}>
       <Div className=" h-full overflow-y-auto pb-[112px]">
         {/* Identity */}
-        <Div className="bg-ink-900 px-5 pb-6" style={{ paddingTop: DEVICE.safeTop + 10 }}>
+        <Div className={`bg-ink-900 ${tablet ? 'px-8 pb-8' : 'px-5 pb-6'}`} style={{ paddingTop: DEVICE.safeTop + (tablet ? 18 : 10) }}>
           <Div className="flex-row items-center justify-between">
-            <P className="text-title-md text-white">Profile</P>
+            <P className={`${tablet ? 'text-title-lg' : 'text-title-md'} text-white`}>Profile</P>
             <IconButton size={36} tone="glass" label="Edit" onClick={() => nav.navigate('dr-profile-setup')}>
               <Pencil className="h-[15px] w-[15px]" strokeWidth={2.2} />
             </IconButton>
           </Div>
 
-          <Div className="mt-5 flex-row items-center gap-4">
-            <DoctorAvatar src={doctor.photo} name={doctor.name} size={72} ring />
+          <Div className={`${tablet ? 'mt-7 gap-6' : 'mt-5 gap-4'} flex-row items-center`}>
+            <DoctorAvatar src={doctor.photo} name={doctor.name} size={tablet ? 112 : 72} ring />
             <Div className="min-w-0 flex-1">
               <Div className="flex-row items-center gap-1.5">
-                <P className="truncate text-title-sm text-white">{doctor.name}</P>
-                <VerifiedDoctorBadge size={15} />
+                <P className={`truncate ${tablet ? 'text-title-lg' : 'text-title-sm'} text-white`}>{doctor.name}</P>
+                <VerifiedDoctorBadge size={tablet ? 20 : 15} />
               </Div>
-              <P className="mt-0.5 truncate text-body-sm text-white/70">{doctor.specialization}</P>
-              <P className="truncate text-caption text-white/45">{doctor.experience} years experience</P>
+              <P className={`mt-0.5 truncate ${tablet ? 'text-body-lg' : 'text-body-sm'} text-white/70`}>{doctor.specialization}</P>
+              <P className={`truncate ${tablet ? 'text-body' : 'text-caption'} text-white/45`}>{doctor.experience} years experience</P>
             </Div>
           </Div>
 
           <Btn
             onPress={() => nav.navigate('dr-professional-profile')}
-            className="tap mt-4 flex-row w-full items-center justify-between rounded-tile bg-white/8 px-3.5 py-2.5 ring-1 ring-inset  ring-white/12"
+            className={`tap ${tablet ? 'mt-6' : 'mt-4'} flex-row w-full items-center justify-between rounded-tile bg-white/8 px-3.5 py-2.5 ring-1 ring-inset  ring-white/12`}
           >
             <Span className="text-body-sm font-semibold text-white">View public profile</Span>
             <ChevronRight className="h-[16px] w-[16px] text-white/60" />
