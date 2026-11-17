@@ -72,10 +72,13 @@ export function EarningsScreen() {
           <P className="mt-1.5 font-display text-[36px] font-extrabold leading-none tabular-nums tracking-[-1px] text-white">
             {rupee(earnings.month)}
           </P>
-          <P className="mt-2 flex-row items-center gap-1.5 text-body-sm text-vital-300">
-            <TrendingUp className="h-[14px] w-[14px]" strokeWidth={2.4} />
-            12% above September
-          </P>
+          {/* Demo only: the server's summary has no last-month total to compare with. */}
+          {!LIVE && (
+            <P className="mt-2 flex-row items-center gap-1.5 text-body-sm text-vital-300">
+              <TrendingUp className="h-[14px] w-[14px]" strokeWidth={2.4} />
+              12% above September
+            </P>
+          )}
 
           <Div className="mt-5 flex-row divide-x divide-white/10 rounded-tile bg-white/8 py-3">
             {[
@@ -112,7 +115,7 @@ export function EarningsScreen() {
             <BarChart
               data={period === 'w' ? earnings.weekSeries : earnings.monthSeries}
               labels={period === 'w' ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['W1', 'W2', 'W3', 'W4', 'W5']}
-              highlight={period === 'w' ? 4 : 3}
+              highlight={period === 'w' ? (LIVE ? (new Date().getDay() + 6) % 7 : 4) : LIVE ? Math.min(4, Math.floor((new Date().getDate() - 1) / 7)) : 3}
             />
           </Card>
 

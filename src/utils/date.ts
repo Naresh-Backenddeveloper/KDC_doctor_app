@@ -100,6 +100,13 @@ export function clock(totalSeconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+/** "5:44 PM" for a server timestamp, in the phone's time zone. */
+export function clockOf(iso: string): string {
+  const d = new Date(iso);
+  const h = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12;
+  return `${h}:${String(d.getMinutes()).padStart(2, '0')} ${d.getHours() >= 12 ? 'PM' : 'AM'}`;
+}
+
 export function nowTime(): string {
   const d = new Date();
   const h = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12;

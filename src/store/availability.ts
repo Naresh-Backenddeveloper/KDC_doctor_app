@@ -26,7 +26,7 @@ interface AvailabilityState {
 
 export const useAvailability = create<AvailabilityState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // Live: filled from the server by services/live/sync-schedule.ts.
       week: LIVE ? OFF_WEEK : seed.week(),
       duration: 15,
@@ -46,8 +46,27 @@ export const useAvailability = create<AvailabilityState>()(
         await services.availability.saveSchedule(week, duration);
         set({ week, duration, breakFrom, breakTo, modesOffered: modes });
       },
-      toggleDay: (short) =>
-        set((s) => ({ week: s.week.map((d) => (d.short === short ? { ...d, on: !d.on } : d)) })),
+      toggleDay: (short) => {
+        const before = get().week;
+        // A day switched on with no hours of its own (live: an off day comes back without any)
+        // takes the hours and consultation types of another working day.
+        const template = before.find((d) => d.on && d.sessions.length);
+        const week = before.map((d) =>
+          d.short !== short ? d : !d.on && !d.sessions.length && template ? { ...d, on: true, sessions: template.sessions, modes: template.modes } : { ...d, on: !d.on },
+        );
+        set({ week });
+        if (!LIVE) return;
+        // Live: the server's schedule is what patients book against, so the change is saved at once.
+        const { duration, breakFrom, breakTo } = get();
+        const live = require('../services/live/availability') as typeof import('../services/live/availability');
+        live.saveScheduleLive(week, duration, breakFrom, breakTo).then(
+          () => (require('../services/live/sync-schedule') as typeof import('../services/live/sync-schedule')).loadAvailability(),
+          (e: unknown) => {
+            set({ week: before });
+            (require('./toast') as typeof import('./toast')).showToast(e instanceof Error ? e.message : 'Couldn’t update your schedule', 'critical');
+          },
+        );
+      },
       addBlock: async (block) => {
         await services.availability.addBlock(block);
         if (LIVE) await (require('../services/live/sync-schedule') as typeof import('../services/live/sync-schedule')).loadBlocks();

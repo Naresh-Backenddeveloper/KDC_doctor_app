@@ -19,13 +19,14 @@ import { useRecords } from '../../store/records';
 import { useSelection } from '../../store/selection';
 import { showToast } from '../../store/toast';
 import type { SendResult } from '../../store/flows';
-import type { Prescription } from '../../types';
+import type { ConsultationDraft, Prescription } from '../../types';
 import { addDays, longDate, recordDate, TODAY_KEY } from '../../utils/date';
 import type { FollowUpForm } from '../../validation/schemas';
 import { services } from '../index';
 import { ServiceError } from '../mock';
+import { LIVE } from '../config';
 import { api } from './http';
-import { consultationOf, NO_CONSULTATION } from './prescriptions';
+import { consultationOf, draftBody, NO_CONSULTATION } from './prescriptions';
 import { syncAll } from './sync';
 import { loadPatient, loadPrescription, loadPrescriptions, toPrescription, type ApiPrescription } from './sync-records';
 
@@ -49,6 +50,77 @@ function newDraft(key: string, init: { patientId: string; apptId?: string; diagn
 }
 
 /** A draft already saved on the server for this consultation replaces an empty local one. */
+interface ApiNotes {
+  chiefComplaint: string | null;
+  symptoms: string[];
+  observations: string | null;
+  assessment: string | null;
+  diagnosis: string[];
+  advice: string[];
+  vitals: { bp?: string; pulse?: number; weight?: number; spo2?: number };
+  savedAt: string | null;
+}
+
+/**
+ * The consultation's saved notes (after an app restart, or written on another device), unless
+ * this phone already has them. A prescription draft with no diagnosis yet takes the notes'.
+ */
+export async function loadNotes(apptId: string): Promise<ConsultationDraft | null> {
+  let n: ApiNotes | null;
+  try {
+    n = await api.get<ApiNotes | null>(`doctor/consultations/${encodeURIComponent(apptId)}/notes`);
+  } catch {
+    return null;
+  }
+  if (!n) return null;
+  const notes: ConsultationDraft = {
+    key: apptId,
+    chiefComplaint: n.chiefComplaint ?? '',
+    symptoms: n.symptoms ?? [],
+    observations: n.observations ?? '',
+    assessment: n.assessment ?? '',
+    diagnosis: n.diagnosis ?? [],
+    advice: n.advice ?? [],
+    vitals: {
+      bp: n.vitals?.bp ?? '',
+      pulse: n.vitals?.pulse ? String(n.vitals.pulse) : '',
+      weight: n.vitals?.weight ? String(n.vitals.weight) : '',
+      spo2: n.vitals?.spo2 ? String(n.vitals.spo2) : '',
+    },
+    savedAt: n.savedAt ?? undefined,
+  };
+  useConsultation.setState((s) => (s.drafts[apptId] ? s : { drafts: { ...s.drafts, [apptId]: notes } }));
+  if (notes.diagnosis.length) {
+    usePrescriptions.setState((s) => {
+      const rx = s.drafts[apptId];
+      return rx && !rx.diagnosis.length ? { drafts: { ...s.drafts, [apptId]: { ...rx, diagnosis: notes.diagnosis } } } : s;
+    });
+  }
+  return useConsultation.getState().drafts[apptId] ?? notes;
+}
+
+/*
+ * The prescription being written is saved on the consultation a moment after each change, so
+ * an app restart (or another device) carries on with it. Issuing sends the final version.
+ */
+const pendingSaves = new Map<string, ReturnType<typeof setTimeout>>();
+if (LIVE) usePrescriptions.subscribe((s, prev) => {
+  for (const [key, rx] of Object.entries(s.drafts)) {
+    if (rx === prev.drafts[key] || rx.status !== 'draft') continue;
+    const appointment = consultationOf(rx);
+    if (!appointment || !(rx.medicines.length || rx.diagnosis.length)) continue;
+    clearTimeout(pendingSaves.get(key));
+    pendingSaves.set(
+      key,
+      setTimeout(() => {
+        pendingSaves.delete(key);
+        const latest = usePrescriptions.getState().drafts[key];
+        if (latest?.status === 'draft') api.put(`doctor/consultations/${encodeURIComponent(appointment)}/prescription`, draftBody(latest)).catch(() => undefined);
+      }, 1200),
+    );
+  }
+});
+
 async function pullServerDraft(apptId: string) {
   try {
     const p = await api.get<ApiPrescription | null>(`doctor/consultations/${encodeURIComponent(apptId)}/prescription`);
@@ -87,7 +159,7 @@ export function ensureRxDraft(key: string): void {
     const diagnosis = useConsultation.getState().draftFor(key).diagnosis;
     usePrescriptions.setState((s) => ({ drafts: { ...s.drafts, [key]: newDraft(key, { patientId: appt.patientId, apptId: appt.id, diagnosis }) } }));
   }
-  void pullServerDraft(appt.id);
+  void pullServerDraft(appt.id).then(() => loadNotes(appt.id));
 }
 
 export async function sendPrescription(key: string): Promise<SendResult> {

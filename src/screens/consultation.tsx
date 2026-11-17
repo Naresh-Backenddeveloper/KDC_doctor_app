@@ -39,6 +39,7 @@ import { FieldError, FormInput, FormTextArea, useZodForm } from '../components/u
 import { useCallClock } from '../hooks/useCallClock'
 import { useConsultation } from '../store/consultation'
 import { LIVE } from '../services/config'
+import { loadNotes } from '../services/live/flows-records'
 import { useCurrentAppointment } from '../store/context'
 import { useDoctor } from '../store/doctor'
 import { beginConsultation, ensureRxDraft, selectPatient } from '../store/flows'
@@ -687,6 +688,19 @@ export function NotesScreen() {
   const { field: advice } = useController({ control: form.control, name: 'advice' })
   const [saving, setSaving] = React.useState(false)
   const [editing, setEditing] = React.useState<null | { list: 'diagnosis' | 'advice'; index?: number }>(null)
+  // Live: notes saved earlier (before an app restart, or on another device) fill the form.
+  React.useEffect(() => {
+    if (!LIVE || useConsultation.getState().drafts[appt.id]) return
+    let alive = true
+    loadNotes(appt.id).then((n) => {
+      if (alive && n && !form.formState.isDirty) {
+        form.reset({ chiefComplaint: n.chiefComplaint, symptoms: n.symptoms, observations: n.observations, assessment: n.assessment, diagnosis: n.diagnosis, advice: n.advice, vitals: n.vitals })
+      }
+    })
+    return () => {
+      alive = false
+    }
+  }, [appt.id, form])
   const [templates, setTemplates] = React.useState(false)
 
   // Demo: the blueprint's suggested diagnoses. Live: none until the doctor writes them.

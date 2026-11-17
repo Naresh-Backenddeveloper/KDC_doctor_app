@@ -1,5 +1,6 @@
 import { Btn, Div, Span } from '../primitives/index'
 import React from 'react'
+import { Keyboard, Platform } from 'react-native'
 import { DEVICE, footerInset } from './Screen'
 import { Loader2 } from '../primitives/icons'
 
@@ -98,21 +99,40 @@ export function IconButton({
 }
 
 /** Sticky bottom action bar — the standard place for a screen's primary CTA. */
+/** The keyboard's height while it's open (0 when closed, or when not `enabled`). */
+function useKeyboardHeight(enabled: boolean) {
+  const [height, setHeight] = React.useState(0)
+  React.useEffect(() => {
+    if (!enabled) return
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', (e) => setHeight(e.endCoordinates.height))
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setHeight(0))
+    return () => {
+      show.remove()
+      hide.remove()
+    }
+  }, [enabled])
+  return height
+}
+
 export function StickyBar({
   children,
   className = '',
   blur = true,
+  aboveKeyboard = false,
 }: {
   children: React.ReactNode
   className?: string
   blur?: boolean
+  /** For a bar holding a text field (a reply box): it rides on top of the keyboard while typing. */
+  aboveKeyboard?: boolean
 }) {
+  const keyboard = useKeyboardHeight(aboveKeyboard)
   return (
     <Div
       className={`absolute inset-x-0 bottom-0 z-30 border-t border-ink-100 px-5 pt-3.5 ${
         blur ? 'bg-white/92 ' : 'bg-white'
       } ${className}`}
-      style={{ paddingBottom: footerInset() }}
+      style={keyboard ? { bottom: keyboard, paddingBottom: 14 } : { paddingBottom: footerInset() }}
     >
       {children}
     </Div>

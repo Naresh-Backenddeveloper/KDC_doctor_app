@@ -28,6 +28,7 @@ import { countAwaiting, filterPatients, useRecords, type PatientFilter } from '.
 import { useSelection } from '../store/selection'
 import { showToast } from '../store/toast'
 import { LIVE } from '../services/config'
+import { ServiceError } from '../services/mock'
 import { loadPatient } from '../services/live/sync-records'
 import type { Report } from '../types'
 
@@ -95,17 +96,32 @@ export function PatientsScreen() {
 /* =============================================== 16 — Patient profile ==== */
 
 /** Live: a patient's contact, history and reports load when opened (each read is logged on the server). */
-function useLivePatient(id: string) {
+function useLivePatient(id: string): 'loading' | 'shared' | 'not-shared' {
+  const [access, setAccess] = React.useState<'loading' | 'shared' | 'not-shared'>(LIVE ? 'loading' : 'shared')
   React.useEffect(() => {
     if (!LIVE || !id) return
-    loadPatient(id).catch((e: unknown) => showToast(e instanceof Error ? e.message : 'Couldn’t load this patient', 'critical'))
+    let alive = true
+    setAccess('loading')
+    loadPatient(id).then(
+      () => alive && setAccess('shared'),
+      (e: unknown) => {
+        if (!alive) return
+        // 404: the record isn't shared with this doctor (no current care relationship).
+        if (e instanceof ServiceError && e.code === 'not_found') setAccess('not-shared')
+        else showToast(e instanceof Error ? e.message : 'Couldn’t load this patient', 'critical')
+      },
+    )
+    return () => {
+      alive = false
+    }
   }, [id])
+  return access
 }
 
 export function PatientProfileScreen() {
   const nav = useNav()
   const p = useCurrentPatient()
-  useLivePatient(p.id)
+  const access = useLivePatient(p.id)
   const rxCount = usePrescriptions((st) => st.summaries.filter((r) => r.patientId === p.id).length)
   const reports = useRecords((st) => st.reports)
   const patientReports = reports.filter((r) => r.patientId === p.id)
@@ -114,12 +130,12 @@ export function PatientProfileScreen() {
     { label: 'Consultation history', sub: `${p.consults} consultations`, Icon: Clock, screen: 'dr-patient-history' },
     { label: 'Prescriptions', sub: `${rxCount} issued by you`, Icon: FileText, screen: 'dr-patient-rx' },
     { label: 'Diagnostic reports', sub: `${patientReports.length} reports · ${patientReports.filter((r) => r.status === 'pending').length} awaiting`, Icon: FlaskConical, screen: 'dr-reports' },
-    { label: 'Documents', sub: '2 uploaded by patient', Icon: FolderOpen, screen: 'dr-reports' },
+    { label: 'Documents', sub: LIVE ? `${p.documents ?? 0} uploaded by patient` : '2 uploaded by patient', Icon: FolderOpen, screen: 'dr-reports' },
   ]
 
   return (
     <Screen background="bg-canvas" padBottom={false}>
-      <ScreenHeader title="Patient record" subtitle={p.id} />
+      <ScreenHeader title="Patient record" subtitle={LIVE ? undefined : p.id} />
 
       <Div className="flex-1 gap-3 px-5 pb-[130px] pt-4">
         {/* Identity */}
@@ -198,10 +214,16 @@ export function PatientProfileScreen() {
           </Card>
         </Div>
 
-        <P className="px-1 text-caption leading-[17px] text-ink-400">
-          You can see this record because {p.name.split(' ')[0]} has an active care relationship with you. Access is
-          logged and ends 90 days after the last consultation.
-        </P>
+        {access === 'not-shared' ? (
+          <P className="px-1 text-caption leading-[17px] text-critical-600">
+            {p.name.split(' ')[0]}’s record isn’t shared with you. Records open during a consultation and for 90 days after it.
+          </P>
+        ) : (
+          <P className="px-1 text-caption leading-[17px] text-ink-400">
+            You can see this record because {p.name.split(' ')[0]} has an active care relationship with you. Access is
+            logged and ends 90 days after the last consultation.
+          </P>
+        )}
       </Div>
 
       <StickyBar>

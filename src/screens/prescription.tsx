@@ -45,7 +45,7 @@ import { injectFailure } from '../services'
 import { LIVE } from '../services/config'
 import { useEarnings } from '../store/earnings'
 import type { CatalogMedicine, Mode, PrescribedMedicine } from '../types'
-import { addDays, dateOptions, dayMonthLong, keyOfLabel, longDate, TODAY_KEY } from '../utils/date'
+import { addDays, dateOptions, dayMonthLong, keyOfLabel, longDate, nowTime, TODAY_KEY } from '../utils/date'
 import { followUpSchema, type FollowUpForm } from '../validation/schemas'
 
 /** The draft in hand, kept alive across the consultation's screens. */
@@ -544,7 +544,7 @@ export function ReviewPrescriptionScreen() {
             <Div className="min-w-0">
               <P className="text-caption text-ink-400">Digitally signed by</P>
               <P className="mt-0.5 truncate text-body-sm font-bold text-ink-900">{doctor.name}</P>
-              <P className="text-caption text-ink-400">{rx.date} · 5:44 PM</P>
+              <P className="text-caption text-ink-400">{rx.date} · {LIVE ? rx.time ?? nowTime() : '5:44 PM'}</P>
             </Div>
             <DoctorAvatar src={doctor.photo} name={doctor.name} size={44} />
           </Div>

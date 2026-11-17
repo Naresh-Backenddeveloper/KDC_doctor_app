@@ -17,6 +17,8 @@ export interface Patient {
   consults: number;
   since: string;
   followUpDue?: boolean;
+  /** Live: documents the patient has shared (known once the record is opened). */
+  documents?: number;
 }
 
 export interface Appointment {
@@ -156,6 +158,8 @@ export interface Prescription {
   patientId: string;
   apptId?: string;
   date: string;
+  /** Live: when it was issued ("5:44 PM"); a draft has none yet. */
+  time?: string;
   diagnosis: string[];
   medicines: PrescribedMedicine[];
   advice: string[];

@@ -12,7 +12,7 @@
 import type { ConsultationHistoryEntry, Mode, Patient, PrescribedMedicine, Prescription, PrescriptionSummary, Report, ReportDetail, ReportResult } from '../../types';
 import { useRecords } from '../../store/records';
 import { usePrescriptions } from '../../store/prescriptions';
-import { localTodayKey, longDate, recordDate } from '../../utils/date';
+import { clockOf, localTodayKey, longDate, recordDate } from '../../utils/date';
 import { api } from './http';
 import { registerDomain } from './sync';
 
@@ -46,6 +46,7 @@ interface ApiPatient {
   nextConsultation: { code: string; startsAt: string; mode: Mode } | null;
   history: { appointmentCode: string; date: string; mode: Mode; durationMin: number; summary: string | null; prescriptionCode: string | null }[];
   prescriptions: { code: string; status: string; issuedAt: string | null; diagnosis: string[] }[];
+  documents?: unknown[];
 }
 
 interface ApiReport {
@@ -162,6 +163,7 @@ export function toPrescription(p: ApiPrescription): Prescription {
     patientId: p.patient.memberId ? String(p.patient.memberId) : '',
     apptId: p.appointmentCode,
     date: dayOf(p.issuedAt) || recordDate(localTodayKey()),
+    time: p.issuedAt ? clockOf(p.issuedAt) : undefined,
     diagnosis: p.diagnosis,
     medicines,
     advice: p.advice,
@@ -197,7 +199,14 @@ export async function loadPatients(): Promise<void> {
   const [rows, followUps] = await Promise.all([pages<ApiPatientRow>('doctor/patients?filter=all'), pages<ApiPatientRow>('doctor/patients?filter=followup')]);
   const due = new Set(followUps.map((r) => r.memberId));
   const before = new Map(useRecords.getState().patients.map((p) => [p.id, p]));
-  useRecords.setState({ patients: rows.map((r) => ({ ...toPatient(r, before.get(String(r.memberId))), followUpDue: due.has(r.memberId) })) });
+  const shared = rows.map((r) => ({ ...toPatient(r, before.get(String(r.memberId))), followUpDue: due.has(r.memberId) }));
+  const ids = new Set(shared.map((p) => p.id));
+  // Patients on the schedule whose record isn't shared (any more) keep their name from the
+  // appointment, without clinical details. Replacing the list outright blanked them.
+  const scheduled = [...before.values()]
+    .filter((p) => !ids.has(p.id))
+    .map((p) => ({ ...p, blood: '—', mobileMasked: '', city: '', conditions: [], allergies: [], followUpDue: false }));
+  useRecords.setState({ patients: [...shared, ...scheduled] });
 }
 
 /**
@@ -224,6 +233,7 @@ export async function loadPatient(id: string): Promise<void> {
       consults: p.consults,
       lastConsult: dayOf(p.lastConsultation) || '—',
       nextAppointment: p.nextConsultation ? nextLabel(p.nextConsultation.startsAt) : undefined,
+      documents: p.documents?.length ?? 0,
     };
     const history: ConsultationHistoryEntry[] = p.history.map((h) => ({
       id: `h-${h.appointmentCode}`,

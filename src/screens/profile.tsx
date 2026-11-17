@@ -1213,7 +1213,7 @@ export function TicketScreen() {
         )}
       </Div>
 
-      <StickyBar>
+      <StickyBar aboveKeyboard>
         <Div className="flex-row items-center gap-2.5">
           <IconButton size={44} label="Attach" onClick={attach}>
             <Paperclip className="h-[17px] w-[17px] text-ink-500" strokeWidth={2.2} />

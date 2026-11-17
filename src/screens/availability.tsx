@@ -33,7 +33,8 @@ import { useSelection } from '../store/selection'
 import { affectedByBlock, bookedThisWeek, slotSummary, todaysAppointments } from '../store/selectors'
 import { showToast } from '../store/toast'
 import type { Mode, WorkingDay } from '../types'
-import { addDays, dateOptions, daysBetween, keyOfLabel, longDate, shortDate, TIME_OPTIONS, todayHeader } from '../utils/date'
+import { LIVE } from '../services/config'
+import { addDays, dateOptions, daysBetween, keyOfLabel, longDate, shortDate, TIME_OPTIONS, TODAY_KEY, todayHeader } from '../utils/date'
 import { blockTimeSchema, scheduleSchema, type BlockTimeForm, type ScheduleForm } from '../validation/schemas'
 
 /* ============================================== 12 — My availability ====== */
@@ -392,8 +393,9 @@ export function BlockTimeScreen() {
 
   const form = useZodForm<BlockTimeForm>(blockTimeSchema, {
     reason: 'Leave',
-    fromKey: preset ?? '2026-10-12',
-    toKey: preset ?? addDays('2026-10-12', 2),
+    // Live: tomorrow, one day; the demo keeps the blueprint's 12–14 Oct.
+    fromKey: preset ?? (LIVE ? addDays(TODAY_KEY, 1) : '2026-10-12'),
+    toKey: preset ?? (LIVE ? addDays(TODAY_KEY, 1) : addDays('2026-10-12', 2)),
     allDay: true,
     from: '09:00 AM',
     to: '01:00 PM',
