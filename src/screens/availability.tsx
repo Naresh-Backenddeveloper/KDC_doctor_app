@@ -30,7 +30,7 @@ import { useDoctor } from '../store/doctor'
 import { blockTime, setOnDuty } from '../store/flows'
 import { useRecords } from '../store/records'
 import { useSelection } from '../store/selection'
-import { affectedByBlock, bookedThisWeek, slotSummary, todaysAppointments } from '../store/selectors'
+import { affectedByBlock, bookedThisWeek, liveSlotSummary, slotSummary, todaysAppointments } from '../store/selectors'
 import { showToast } from '../store/toast'
 import type { Mode, WorkingDay } from '../types'
 import { LIVE } from '../services/config'
@@ -46,11 +46,16 @@ export function AvailabilityScreen() {
   const blocked = useAvailability((st) => st.blocked)
   const toggleDay = useAvailability((st) => st.toggleDay)
   const removeBlock = useAvailability((st) => st.removeBlock)
+  const [removing, setRemoving] = React.useState<(typeof blocked)[number] | null>(null)
   const onDuty = useAppointments((st) => st.onDuty)
   const appointments = useAppointments((st) => st.appointments)
-  const today = week[0]
+  // Live: today's own weekday (the week runs Mon–Sun); the demo is set on a Monday.
+  const today = LIVE ? week[(new Date().getDay() + 6) % 7] : week[0]
   const active = todaysAppointments(appointments).filter((x) => x.status !== 'cancelled' && x.status !== 'no-show').length
-  const todaySlots = slotSummary(today, duration, active)
+  const todaySlots = LIVE ? liveSlotSummary(today, duration, active, blocked, TODAY_KEY) : slotSummary(today, duration, active)
+  // A long day draws at most 40 boxes, each standing for a share of the slots.
+  const boxes = Math.min(todaySlots.total, 40)
+  const scale = boxes ? todaySlots.total / boxes : 1
 
   return (
     <Screen background="bg-canvas" padBottom={false}>
@@ -80,11 +85,11 @@ export function AvailabilityScreen() {
 
           {/* Slot ribbon — load at a glance, with counts not just colour */}
           <Div className="mt-3 flex-row gap-[3px]">
-            {Array.from({ length: todaySlots.total }).map((_, i) => (
+            {Array.from({ length: boxes }).map((_, i) => (
               <Span
                 key={i}
                 className={`h-[26px] flex-1 rounded-[3px] ${
-                  i < todaySlots.booked ? 'bg-brand-600' : i < todaySlots.booked + todaySlots.open ? 'bg-brand-100' : 'bg-ink-100'
+                  i * scale < todaySlots.booked ? 'bg-brand-600' : i * scale < todaySlots.booked + todaySlots.open ? 'bg-brand-100' : 'bg-ink-100'
                 }`}
               />
             ))}
@@ -162,7 +167,7 @@ export function AvailabilityScreen() {
                   </P>
                 </Div>
                 <StatusBadge tone="neutral">{b.reason}</StatusBadge>
-                <IconButton size={30} label="Remove" onClick={() => removeBlock(b.id)}>
+                <IconButton size={30} label="Remove" onClick={() => setRemoving(b)}>
                   <Trash2 className="h-[14px] w-[14px] text-ink-400" strokeWidth={2.2} />
                 </IconButton>
               </Div>
@@ -170,6 +175,32 @@ export function AvailabilityScreen() {
           </Div>
         </Div>
       </Div>
+
+      <ModalSheet
+        visible={removing !== null}
+        title="Remove this block?"
+        subtitle={removing ? `${removing.date} · ${removing.time}` : undefined}
+        onClose={() => setRemoving(null)}
+        footer={
+          <Div className="flex-row gap-2.5">
+            <Button variant="tertiary" className="flex-1" onClick={() => setRemoving(null)}>
+              Keep it
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              onClick={() => {
+                if (removing) void removeBlock(removing.id)
+                setRemoving(null)
+              }}
+            >
+              Remove
+            </Button>
+          </Div>
+        }
+      >
+        <P className="pb-2 text-body leading-[22px] text-ink-600">Patients can book these times again. Appointments cancelled by the block stay cancelled.</P>
+      </ModalSheet>
 
       <StickyBar>
         <Div className="flex-row gap-2.5">

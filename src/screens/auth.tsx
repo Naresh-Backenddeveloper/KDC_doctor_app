@@ -29,7 +29,7 @@ import { ScreenHeader } from '../components/ui/Nav'
 import { Banner, ModalSheet } from '../components/ui/Feedback'
 import { DOCTOR_SCENE } from '../mock-data/media'
 import { experienceHistory, rupee } from '../mock-data/mock'
-import { COUNCILS, EXPERIENCE_OPTIONS, LANGUAGES, SPECIALIZATIONS, SUB_SPECIALIZATIONS } from '../mock-data/options'
+import { COUNCILS, EXPERIENCE_OPTIONS, LANGUAGES, SPECIALIZATIONS, SUB_SPECIALIZATIONS, experienceLabel } from '../mock-data/options'
 import { DoctorAvatar, VerifiedDoctorBadge, MODE } from '../components/doctor/index'
 import { isDevLaunch, useNav } from '../navigation/navigation'
 import { Linking } from 'react-native'
@@ -588,7 +588,7 @@ export function VerificationScreen() {
             <KeyValue label="Council" value={declared.council} />
             <KeyValue label="Specialization" value={declared.specialization} />
             <KeyValue label="Qualification" value={declared.qualification} />
-            <KeyValue label="Experience" value={`${declared.experience} years`} />
+            <KeyValue label="Experience" value={declared.experience ? experienceLabel(declared.experience) : '—'} />
           </Card>
         </Div>
 
@@ -695,7 +695,7 @@ function DeclaredDetailsSheet({ onClose }: { onClose: () => void }) {
     council: declared.council,
     specialization: declared.specialization,
     qualification: declared.qualification,
-    experience: `${declared.experience} years`,
+    experience: experienceLabel(declared.experience),
   })
   const submit = form.handleSubmit(async (v: DeclaredForm) => {
     try {
@@ -743,7 +743,7 @@ export function ProfileSetupScreen() {
     name: profile.name,
     qualification: profile.qualification,
     specialization: profile.specialization,
-    experience: `${profile.experience} years`,
+    experience: experienceLabel(profile.experience),
     subSpecialization: profile.subSpecialization,
     languages: profile.languages,
     clinic: profile.clinic,

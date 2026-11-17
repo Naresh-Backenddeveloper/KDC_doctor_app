@@ -299,6 +299,10 @@ describe('logout', () => {
     useSession.setState({ token: 'abc', mobile: '9849011204' });
     const h = makeHarness(<Prof.SettingsScreen />);
     await h.press('Log out');
+    // A confirmation sheet first: the session stays until it's confirmed.
+    expect(useSession.getState().token).toBe('abc');
+    expect(h.text()).toContain('Log out of KDC+?');
+    await h.press('Log out');
     expect(useSession.getState().token).toBeNull();
     expect(mockResetTo).toHaveBeenCalledWith('dr-login');
   });

@@ -100,3 +100,20 @@ export function slotSummary(day: WorkingDay | undefined, duration: number, activ
   const blocked = Math.min(2, total);
   return { total, booked: Math.min(booked, total), blocked, open: Math.max(0, total - booked - blocked) };
 }
+
+/**
+ * Live: today's slots from the real schedule. Total from today's sessions and slot length;
+ * booked from today's appointments; blocked from today's time off (all day blocks everything).
+ */
+export function liveSlotSummary(day: WorkingDay | undefined, duration: number, booked: number, blocks: BlockedTime[], todayKey: string) {
+  const minutes = day?.on ? (day.sessions ?? []).reduce((sum, s) => sum + Math.max(0, minutesOf(s.to) - minutesOf(s.from)), 0) : 0;
+  const total = duration > 0 ? Math.floor(minutes / duration) : 0;
+  const today = blocks.filter((b) => b.fromKey <= todayKey && todayKey <= b.toKey);
+  const blockedMinutes = today.some((b) => b.allDay)
+    ? minutes
+    : today.reduce((sum, b) => sum + (b.from && b.to ? Math.max(0, minutesOf(b.to) - minutesOf(b.from)) : 0), 0);
+  const blocked = Math.min(total, duration > 0 ? Math.ceil(blockedMinutes / duration) : 0);
+  const taken = Math.min(booked, total - blocked);
+  return { total, booked: taken, blocked, open: Math.max(0, total - taken - blocked) };
+}
+

@@ -41,7 +41,7 @@ import { FormInput, FormSelect, FormTextArea, useZodForm } from '../components/u
 import { Logo } from '../components/ui/Logo'
 import { DoctorAvatar, DoctorNav, DoctorNotificationCard, MODE, VerifiedDoctorBadge } from '../components/doctor/index'
 import { rupee, supportTopics } from '../mock-data/mock'
-import { ACCOUNT_TYPES, APP_LANGUAGES, EXPERIENCE_OPTIONS, SPECIALIZATIONS, SUB_SPECIALIZATIONS } from '../mock-data/options'
+import { ACCOUNT_TYPES, APP_LANGUAGES, EXPERIENCE_OPTIONS, SPECIALIZATIONS, SUB_SPECIALIZATIONS, experienceLabel } from '../mock-data/options'
 import { useNav } from '../navigation/navigation'
 import { Linking } from 'react-native'
 import { useController } from 'react-hook-form'
@@ -195,7 +195,7 @@ export function ProfileScreen() {
                 <VerifiedDoctorBadge size={tablet ? 20 : 15} />
               </Div>
               <P className={`mt-0.5 truncate ${tablet ? 'text-body-lg' : 'text-body-sm'} text-white/70`}>{doctor.specialization}</P>
-              <P className={`truncate ${tablet ? 'text-body' : 'text-caption'} text-white/45`}>{doctor.experience} years experience</P>
+              <P className={`truncate ${tablet ? 'text-body' : 'text-caption'} text-white/45`}>{experienceLabel(doctor.experience) || '—'} experience</P>
             </Div>
           </Div>
 
@@ -266,7 +266,7 @@ export function ProfessionalInfoScreen() {
   const form = useZodForm(professionalInfoSchema, {
     specialization: doctor.specialization,
     subSpecialization: doctor.subSpecialization,
-    experience: `${doctor.experience} years`,
+    experience: experienceLabel(doctor.experience),
     languages: doctor.languages,
   })
   const { field: languages, fieldState: languagesState } = useController({ control: form.control, name: 'languages' })
@@ -747,7 +747,7 @@ const ACCESS_LOG = [
   { who: 'Sunita Rao', when: 'Yesterday, 6:05 PM', what: 'Diagnostic report' },
 ]
 
-type SettingsPanel = null | 'password' | 'devices' | 'log' | 'language' | 'deactivate' | { legal: string }
+type SettingsPanel = null | 'password' | 'devices' | 'log' | 'language' | 'deactivate' | { legal: string } | 'logout'
 
 export function SettingsScreen() {
   const nav = useNav()
@@ -837,7 +837,7 @@ export function SettingsScreen() {
               title="Log out"
               danger
               trailing={<Span />}
-              onClick={signOut}
+              onClick={() => setPanel('logout')}
             />
             <ListRow
               icon={<Trash2 className="h-[16px] w-[16px]" strokeWidth={2.1} />}
@@ -899,6 +899,23 @@ export function SettingsScreen() {
         <P className="pb-2 text-body leading-[22px] text-ink-600">{panel !== null && typeof panel === 'object' ? LEGAL_TEXT[panel.legal] : ''}</P>
       </ModalSheet>
 
+      <ModalSheet
+        visible={panel === 'logout'}
+        title="Log out of KDC+?"
+        onClose={() => setPanel(null)}
+        footer={
+          <Div className="flex-row gap-2.5">
+            <Button variant="tertiary" className="flex-1" onClick={() => setPanel(null)}>
+              Stay signed in
+            </Button>
+            <Button variant="danger" className="flex-1" onClick={signOut}>
+              Log out
+            </Button>
+          </Div>
+        }
+      >
+        <P className="pb-2 text-body leading-[22px] text-ink-600">Patient details are cleared from this device. Sign in again with your password and an SMS code.</P>
+      </ModalSheet>
       <ModalSheet
         visible={panel === 'deactivate'}
         title="Deactivate your account?"
@@ -1176,7 +1193,7 @@ export function TicketScreen() {
             </StatusBadge>
           </Div>
           <Divider className="my-3" />
-          <KeyValue label="Priority" value={t.priority} tone="critical" />
+          <KeyValue label="Priority" value={t.priority} tone={/^(urgent|high)$/i.test(t.priority) ? 'critical' : undefined} />
           <KeyValue label="Created" value={t.created} />
           <KeyValue label="Last update" value={t.updated} />
         </Card>
@@ -1236,6 +1253,7 @@ export function TicketScreen() {
 export function BankEditScreen() {
   const nav = useNav()
   const bank = useBank((st) => st.bank)
+  const hasAccount = useBank((st) => st.hasAccount)
   const form = useZodForm<BankForm>(bankSchema, {
     holder: bank.holder,
     accountNumber: '',
@@ -1302,7 +1320,7 @@ export function BankEditScreen() {
           </Div>
         </Card>
 
-        <Card elevation="tile">
+        {hasAccount && <Card elevation="tile">
           <P className="mb-2.5 text-[11px] font-bold uppercase tracking-[.08em] text-ink-500">Replacing</P>
           <Div className="flex-row items-center gap-3.5">
             <Span className="flex-col h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[11px] bg-ink-50">
@@ -1314,7 +1332,7 @@ export function BankEditScreen() {
             </Div>
             <StatusBadge tone="neutral">Current</StatusBadge>
           </Div>
-        </Card>
+        </Card>}
 
         <P className="px-1 text-caption leading-[17px] text-ink-400">
           Bank details are stored encrypted and shown masked everywhere in the app. KDC+ support can never see the

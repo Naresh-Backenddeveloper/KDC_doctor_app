@@ -17,6 +17,9 @@ export const SUB_SPECIALIZATIONS = [
   'Interventional Cardiology', 'Electrophysiology', 'Heart Failure', 'Preventive Cardiology', 'Paediatric Cardiology', 'None',
 ];
 
+/** "1 year", "14 years": the picker's own wording. 0 (not declared yet) is blank, so the doctor must choose. */
+export const experienceLabel = (years: number) => (years > 0 ? `${years} ${years === 1 ? 'year' : 'years'}` : '');
+
 export const EXPERIENCE_OPTIONS = Array.from({ length: 45 }, (_, i) => `${i + 1} ${i ? 'years' : 'year'}`);
 
 export const LANGUAGES = ['English', 'Hindi', 'Telugu', 'Tamil', 'Kannada', 'Marathi', 'Malayalam'];

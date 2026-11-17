@@ -240,7 +240,7 @@ export function DoctorHomeScreen() {
                   fill={q.accent ? 'currentColor' : 'none'}
                 />
                 <Span
-                  className={`text-center text-[10.5px] font-bold leading-[13px] ${
+                  className={`w-full text-center text-[10.5px] font-bold leading-[13px] ${
                     q.accent ? 'text-white' : 'text-ink-900'
                   }`}
                 >
@@ -278,13 +278,15 @@ export function DoctorHomeScreen() {
 
         {/* --------------------------------------------- Pending actions --- */}
         <Div className="pt-5">
-          <SectionHeader title="Pending actions" subtitle={`${actions.length} items need you`} className="pb-2.5" />
+          <SectionHeader title="Pending actions" subtitle={`${actions.length} ${actions.length === 1 ? 'item needs' : 'items need'} you`} className="pb-2.5" />
           <Div className="px-5">
-            <Card elevation="tile" padded={false} className="overflow-hidden">
+            {actions.length === 0 ? (
+              <P className="text-body-sm text-ink-400">Nothing needs you right now.</P>
+            ) : <Card elevation="tile" padded={false} className="overflow-hidden">
               {actions.map((a, i) => (
                 <PendingActionRow key={a.id} item={a} last={i === actions.length - 1} onClick={() => openAction(a)} />
               ))}
-            </Card>
+            </Card>}
           </Div>
         </Div>
 
