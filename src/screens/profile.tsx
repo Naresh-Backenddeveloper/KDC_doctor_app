@@ -55,6 +55,7 @@ import { useSession } from '../store/session'
 import { useSelection } from '../store/selection'
 import { useSettings } from '../store/settings'
 import { useSupport } from '../store/support'
+import { useVerification } from '../store/verification'
 import { showToast } from '../store/toast'
 import { services } from '../services'
 import type { DoctorNotification, Mode, NotificationCategory, Qualification, SettingsState, SupportTicket, WorkingDay } from '../types'
@@ -259,6 +260,7 @@ const INFO_LANGUAGES = ['English', 'Hindi', 'Telugu', 'Tamil', 'Kannada']
 
 export function ProfessionalInfoScreen() {
   const nav = useNav()
+  const verified = useVerification((st) => st.status === 'approved')
   const doctor = useDoctor((st) => st.profile)
   const qualifications = useDoctor((st) => st.qualifications)
   const saveProfile = useDoctor((st) => st.saveProfile)
@@ -289,8 +291,8 @@ export function ProfessionalInfoScreen() {
         <Card elevation="tile">
           <Div className="mb-3 flex-row items-center justify-between">
             <P className="text-[11px] font-bold uppercase tracking-[.08em] text-ink-500">Medical registration</P>
-            <StatusBadge tone="success" dot>
-              Verified
+            <StatusBadge tone={verified ? 'success' : 'caution'} dot>
+              {verified ? 'Verified' : 'Not verified yet'}
             </StatusBadge>
           </Div>
           <Field label="Registration number">

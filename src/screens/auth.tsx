@@ -519,6 +519,14 @@ export function VerificationScreen() {
     }
   }
 
+  const [incomplete, setIncomplete] = React.useState<string[] | null>(null)
+  /** Where each of the server's "not complete" items is filled in. */
+  const fixFor = (item: string): { label: string; go: () => void } | null => {
+    if (/qualification/i.test(item)) return { label: 'Add qualification', go: () => nav.navigate('dr-professional-info') }
+    if (/consultation type|fee/i.test(item)) return { label: 'Set fees', go: () => nav.navigate('dr-fees') }
+    if (/registration|council|specialt|experience|declar|name/i.test(item)) return { label: 'Edit details', go: () => editDetails() }
+    return null
+  }
   const submitForReview = async () => {
     if (missing > 0) {
       showToast(`${missing} document${missing > 1 ? 's' : ''} still required`, 'critical')
@@ -529,8 +537,9 @@ export function VerificationScreen() {
       await resubmit()
       showToast(LIVE && serverStatus === 'draft' ? 'Submitted for review' : 'Resubmitted for review')
     } catch (e) {
-      // Live: the server says what's still missing.
-      showToast('Couldn’t submit', 'critical', e instanceof Error ? e.message : undefined)
+      // Live: the server says what's still missing; each item links to where it's filled in.
+      if (e instanceof ServiceError && e.field === 'application') setIncomplete(e.details)
+      else showToast('Couldn’t submit', 'critical', e instanceof Error ? e.message : undefined)
     } finally {
       setResubmitting(false)
     }
@@ -681,6 +690,34 @@ export function VerificationScreen() {
       </StickyBar>
 
       {editingDetails && <DeclaredDetailsSheet onClose={() => setEditingDetails(false)} />}
+
+      {/* Live: what the server says is still missing before review, each with where to fill it in. */}
+      <ModalSheet visible={incomplete !== null} title="Before you submit" subtitle="Your application needs:" onClose={() => setIncomplete(null)}>
+        <Div className="gap-2.5 pb-2">
+          {(incomplete ?? []).map((item) => {
+            const fix = fixFor(item)
+            return (
+              <Div key={item} className="gap-2.5 rounded-tile bg-caution-50 p-3.5">
+                <P className="text-body leading-[21px] text-ink-800">{item}</P>
+                {fix && (
+                  <Button
+                    size="sm"
+                    block={false}
+                    className="self-start px-4"
+                    variant="secondary"
+                    onClick={() => {
+                      setIncomplete(null)
+                      fix.go()
+                    }}
+                  >
+                    {fix.label}
+                  </Button>
+                )}
+              </Div>
+            )
+          })}
+        </Div>
+      </ModalSheet>
     </Screen>
   )
 }

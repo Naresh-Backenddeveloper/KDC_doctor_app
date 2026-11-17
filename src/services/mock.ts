@@ -9,8 +9,11 @@ export function injectFailure(op: string) {
 }
 
 export class ServiceError extends Error {
-  constructor(public code: string, message: string, public field?: string) {
+  /** Every message the server gave for `field` (the message is the first). */
+  public details: string[];
+  constructor(public code: string, message: string, public field?: string, details?: string[]) {
     super(message);
+    this.details = details?.length ? details : [message];
   }
 }
 

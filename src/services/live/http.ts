@@ -115,7 +115,7 @@ function failure(status: number, json: Envelope<unknown> | null): ServiceError {
   if (status >= 500 || !json) return new ServiceError('unavailable', OFFLINE);
   const [field, messages] = Object.entries(json.errors ?? {})[0] ?? [];
   const message = status === 429 ? 'Too many attempts. Please wait a moment and try again.' : (messages?.[0] ?? json.message ?? OFFLINE);
-  return new ServiceError(CODES[status] ?? 'invalid', message, field);
+  return new ServiceError(CODES[status] ?? 'invalid', message, field, status === 429 ? undefined : messages);
 }
 
 /** One call to the backend: the envelope's data, or a ServiceError. */
