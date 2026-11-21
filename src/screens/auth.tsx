@@ -799,7 +799,12 @@ export function ProfileSetupScreen() {
     languages.onChange(languages.value.includes(l) ? languages.value.filter((x: string) => x !== l) : [...languages.value, l])
 
   const submit = form.handleSubmit(async (v) => {
-    await saveProfile({ ...v, experience: parseInt(v.experience, 10), photo })
+    try {
+      await saveProfile({ ...v, experience: parseInt(v.experience, 10), photo })
+    } catch (e) {
+      showToast('Couldn’t save your profile', 'critical', e instanceof Error ? e.message : undefined)
+      return
+    }
     nav.resetTo(hasSession ? 'dr-home' : 'dr-login', 'home')
   })
 

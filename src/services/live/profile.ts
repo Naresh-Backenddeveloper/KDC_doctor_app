@@ -24,7 +24,13 @@ function body(p: Partial<DoctorProfile>) {
   if (p.pin !== undefined) out.pincode = text(p.pin);
   if (p.clinicPhone !== undefined) out.clinicPhone = p.clinicPhone.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '') || null;
   if (p.email !== undefined) out.email = text(p.email);
-  if (p.fees !== undefined) out.fees = { video: p.fees.video, audio: p.fees.audio, clinic: p.fees.clinic };
+  if (p.fees !== undefined) {
+    // Only the fees of the types offered: a type that's off keeps its (possibly empty) fee, which the
+    // server would refuse below ₹100.
+    const on = p.modesEnabled ?? { video: true, audio: true, clinic: true };
+    const fees = Object.fromEntries((['video', 'audio', 'clinic'] as const).filter((m) => on[m] && p.fees![m] > 0).map((m) => [m, p.fees![m]]));
+    if (Object.keys(fees).length) out.fees = fees;
+  }
   if (p.modesEnabled !== undefined) out.modes = { ...p.modesEnabled };
   else if (p.acceptsInPerson !== undefined) out.modes = { clinic: p.acceptsInPerson };
   if (p.freeFollowUp !== undefined) out.freeFollowUp = p.freeFollowUp;

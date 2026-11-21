@@ -278,7 +278,12 @@ export function ProfessionalInfoScreen() {
     languages.onChange(languages.value.includes(l) ? languages.value.filter((x: string) => x !== l) : [...languages.value, l])
 
   const save = form.handleSubmit(async (v) => {
-    await saveProfile({ ...v, experience: parseInt(v.experience, 10) })
+    try {
+      await saveProfile({ ...v, experience: parseInt(v.experience, 10) })
+    } catch (e) {
+      showToast('Couldn’t save', 'critical', e instanceof Error ? e.message : undefined)
+      return
+    }
     showToast('Saved')
     nav.back()
   })
@@ -473,9 +478,9 @@ function FeeCard({ form, mode }: { form: ReturnType<typeof useZodForm<FeesForm>>
       </Div>
       {fieldState.error && <P className="mt-2 text-caption text-critical-600">{fieldState.error.message}</P>}
 
-      <P className="mt-2.5 text-caption text-ink-400">
+      {!LIVE && <P className="mt-2.5 text-caption text-ink-400">
         Cardiologists in Hyderabad charge {rupee(600)} – {rupee(1200)} for this type.
-      </P>
+      </P>}
     </Card>
   )
 }
@@ -496,11 +501,17 @@ export function FeesScreen() {
   const { field: freeFollowUp } = useController({ control: form.control, name: 'freeFollowUp' })
 
   const save = form.handleSubmit(async (v) => {
-    await saveProfile({
-      fees: { video: Number(v.video), audio: Number(v.audio), clinic: Number(v.clinic) },
-      modesEnabled: { video: v.videoOn, audio: v.audioOn, clinic: v.clinicOn },
-      freeFollowUp: v.freeFollowUp,
-    })
+    try {
+      await saveProfile({
+        fees: { video: Number(v.video), audio: Number(v.audio), clinic: Number(v.clinic) },
+        modesEnabled: { video: v.videoOn, audio: v.audioOn, clinic: v.clinicOn },
+        freeFollowUp: v.freeFollowUp,
+      })
+    } catch (e) {
+      // Live: the server's reason (e.g. a fee outside its range), not a silent failure.
+      showToast('Couldn’t save fees', 'critical', e instanceof Error ? e.message : undefined)
+      return
+    }
     showToast('Fees saved')
     nav.back()
   })
